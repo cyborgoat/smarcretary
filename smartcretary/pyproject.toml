@@ -1,0 +1,33 @@
+[project]
+name = "realtime-transcriber"
+version = "0.1.0"
+description = "A simple, real-time speech-to-text application using OpenAI's Whisper model."
+authors = [{ name = "Your Name", email = "you@example.com" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "openai-whisper",
+    "sounddevice",
+    "numpy",
+    "torch",
+    # Force newer versions with Apple Silicon wheels to avoid compilation errors.
+    "numba>=0.58.0",
+    "llvmlite>=0.41.0",
+    "speechrecognition>=3.10.4",
+    "pyaudio>=0.2.14",
+]
+
+[project.scripts]
+# This allows you to run the app using 'uv run transcribe'
+transcribe = "realtime_transcribe:main_cli"
+
+[tool.uv]
+# This section can be used for uv-specific configurations if needed.
+# For now, it can be left empty.
+

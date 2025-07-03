@@ -137,3 +137,35 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Python
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+
+# Virtual environment
+env/
+.venv/
+virtualenv/
+virtualenvs/
+.env/
+
+# IDE-specific files
+.vscode/
+.idea/
+*.iml
+
+# Testing and documentation
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+docs/_build/
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
