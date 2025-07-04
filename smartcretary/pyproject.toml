@@ -18,11 +18,11 @@ dependencies = [
     "torch",
     # Force newer versions with Apple Silicon wheels to avoid compilation errors.
     "numba>=0.58.0",
-    "llvmlite>=0.41.0",
     "speechrecognition>=3.10.4",
-    "pyaudio>=0.2.14",
     "ultralytics>=8.3.162",
     "opencv-python>=4.11.0.86",
+    "pyaudio>=0.2.14",
+    "scipy>=1.10.1",
 ]
 
 [project.scripts]
@@ -32,4 +32,3 @@ transcribe = "realtime_transcribe:main_cli"
 [tool.uv]
 # This section can be used for uv-specific configurations if needed.
 # For now, it can be left empty.
-
