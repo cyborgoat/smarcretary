@@ -21,6 +21,8 @@ dependencies = [
     "llvmlite>=0.41.0",
     "speechrecognition>=3.10.4",
     "pyaudio>=0.2.14",
+    "ultralytics>=8.3.162",
+    "opencv-python>=4.11.0.86",
 ]
 
 [project.scripts]
