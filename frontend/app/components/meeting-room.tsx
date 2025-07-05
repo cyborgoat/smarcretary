@@ -4,10 +4,6 @@ import type React from "react"
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -18,9 +14,6 @@ import {
   VideoOff,
   Phone,
   Settings,
-  Send,
-  Users,
-  MessageCircle,
   MoreVertical,
   Share,
   AlertTriangle,
@@ -28,6 +21,7 @@ import {
 import { useWebRTC } from "../hooks/useWebRTC"
 import { useSocket } from "../hooks/useSocket"
 import { VideoThumbnail } from "@/components/ui/VideoThumbnail"
+import MeetingSidebar from "./MeetingSidebar"
 
 interface Message {
   id: string
@@ -37,13 +31,6 @@ interface Message {
   userId: string
 }
 
-interface Participant {
-  id: string
-  name: string
-  isMuted: boolean
-  isVideoOn: boolean
-  stream?: MediaStream
-}
 
 interface MeetingRoomProps {
   roomId: string
@@ -58,7 +45,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
   const [permissionError, setPermissionError] = useState<string | null>(null)
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null)
   const [participantVolumes, setParticipantVolumes] = useState<{ [id: string]: number }>({})
-  const [mutedParticipants, setMutedParticipants] = useState<{ [id: string]: boolean }>({})
+  const [mutedParticipants] = useState<{ [id: string]: boolean }>({})
   const [showNetworkInfo, setShowNetworkInfo] = useState(false)
   const [isMainVideoLocal, setIsMainVideoLocal] = useState(true)
   const [pipPosition, setPipPosition] = useState({ x: 20, y: 20 })
@@ -95,7 +82,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
     initializeMedia,
     cleanup: cleanupWebRTC,
     handleSignal,
-  } = useWebRTC(roomId, userName, sendSignalingMessage)
+  } = useWebRTC(userName, sendSignalingMessage)
 
   // Stable callback to handle incoming chat messages
   const handleChatMessage = useCallback((message: Message) => {
@@ -202,11 +189,6 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
-
-  // Mute/unmute a remote participant locally
-  const handleMuteParticipant = (id: string) => {
-    setMutedParticipants((prev) => ({ ...prev, [id]: !prev[id] }))
-  }
 
   // Swap main and PiP video
   const swapVideos = () => {
@@ -387,23 +369,29 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
   const mainParticipant = allParticipants[mainIdx]
   const pipParticipant = allParticipants[pipIdx]
 
+  // --- Host logic ---
+  // The host is the user with the lexicographically smallest name (or id) in the room
+  const allNames = [userName, ...participants.map(p => p.name)]
+  const hostName = allNames.sort()[0]
+  const isHost = userName === hostName
+
   return (
-    <div className="h-screen bg-gray-900 flex flex-col">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-stone-100 to-stone-200">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between">
+      <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm border-b border-stone-200/50 p-4 flex items-center justify-between shadow-sm z-10">
         <div className="flex items-center space-x-4">
-          <h1 className="text-white text-xl font-semibold">Room: {roomId}</h1>
-          <Badge variant="secondary" className={`text-white ${isConnected ? 'bg-green-600' : 'bg-yellow-600'}`}> 
+          <h1 className="text-stone-900 text-xl font-medium">Room: {roomId}</h1>
+          <Badge variant="secondary" className={`text-white ${isConnected ? 'bg-emerald-600' : 'bg-amber-600'}`}> 
             {isConnected ? "Connected" : "Connecting..."}
           </Badge>
           {isConnecting && (
-            <Badge variant="secondary" className="bg-yellow-600 text-white">
+            <Badge variant="secondary" className="bg-amber-600 text-white">
               Initializing...
             </Badge>
           )}
           {/* Small network info dot/button */}
           <button
-            className={`ml-2 w-3 h-3 rounded-full border-2 ${isConnected ? 'bg-green-500 border-green-700' : 'bg-yellow-500 border-yellow-700'} flex items-center justify-center relative`}
+            className={`ml-2 w-3 h-3 rounded-full border-2 ${isConnected ? 'bg-emerald-500 border-emerald-700' : 'bg-amber-500 border-amber-700'} flex items-center justify-center relative`}
             title="Network info"
             onClick={() => setShowNetworkInfo((v) => !v)}
             aria-label="Show network info"
@@ -411,10 +399,10 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
             <span className="sr-only">Network info</span>
           </button>
           {showNetworkInfo && (
-            <div className="absolute top-12 left-0 bg-blue-900 border border-blue-700 rounded-lg px-4 py-2 text-blue-200 text-xs z-50 shadow-lg min-w-[220px]">
+            <div className="absolute top-12 left-0 bg-stone-800 border border-stone-700 rounded-lg px-4 py-2 text-stone-200 text-xs z-50 shadow-lg min-w-[220px]">
               <strong>Network Access:</strong> Other devices can join at
               <br />
-              <code className="bg-blue-800 px-1 rounded">
+              <code className="bg-stone-900 px-1 rounded">
                 {window.location.origin.replace('localhost', '10.0.0.37')}?room={roomId}&name=YourName
               </code>
               <br />
@@ -423,11 +411,11 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
           )}
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white" onClick={copyRoomId}>
+          <Button variant="ghost" size="sm" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100" onClick={copyRoomId}>
             <Share className="h-4 w-4 mr-2" />
             Share Room
           </Button>
-          <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white">
+          <Button variant="ghost" size="sm" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100">
             <Settings className="h-4 w-4" />
           </Button>
         </div>
@@ -435,10 +423,10 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
 
       {/* Error Alerts */}
       {(permissionError || webrtcError || socketError) && (
-        <div className="p-4">
-          <Alert className="bg-red-900 border-red-700">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="text-red-200">
+        <div className="p-4 flex-shrink-0">
+          <Alert className="bg-red-50 border-red-200 text-red-900">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
               {permissionError || webrtcError || socketError}
               {socketError && !isConnected && (
                 <div className="mt-2 text-sm">
@@ -454,7 +442,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
                 <div className="mt-2 text-sm">
                   <p>For network access with camera/microphone:</p>
                   <ul className="list-disc list-inside ml-2 mt-1">
-                    <li>Use HTTPS: <code className="bg-red-800 px-1 rounded">npm run dev:https</code></li>
+                    <li>Use HTTPS: <code className="bg-red-100 px-1 rounded">npm run dev:https</code></li>
                     <li>Or access via localhost on this device</li>
                   </ul>
                 </div>
@@ -467,12 +455,13 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
       {/* Render all remote audio elements (hidden) */}
       {renderAllRemoteAudio()}
 
-      <div className={`flex-1 flex ${isMobile ? 'flex-col' : ''}`}>
+      {/* Main Content: Video + Sidebar */}
+      <div className={`flex-1 min-h-0 flex ${isMobile ? 'flex-col' : ''} w-full`}>
         {/* Main Video Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col">
           {/* Video Grid */}
-          <div className="flex-1 p-4 relative">
-            <div className="h-full bg-gray-800 rounded-lg relative overflow-hidden flex items-center justify-center">
+          <div className="flex-1 min-h-0 p-4 relative">
+            <div className="h-full min-h-0 bg-white/60 backdrop-blur-sm rounded-2xl relative overflow-hidden flex items-center justify-center border border-stone-200/50 shadow-lg">
               {/* Main Video (local or selected participant) - unified for mobile and desktop */}
               <div className="w-full max-w-full h-full max-h-[70vh] aspect-[16/9] mx-auto flex items-center justify-center">
                 <VideoTile
@@ -511,7 +500,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
                 ) : (
                   <div
                     ref={pipRef}
-                    className="absolute cursor-move bg-gray-900 rounded-lg border-2 border-gray-600 shadow-lg"
+                    className="absolute cursor-move bg-white/90 backdrop-blur-sm rounded-xl border-2 border-stone-300 shadow-lg"
                     style={{
                       left: pipPosition.x,
                       top: pipPosition.y,
@@ -536,7 +525,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
               )}
 
               {/* Meeting Info Overlay */}
-              <div className="absolute top-4 left-4 bg-black bg-opacity-50 rounded-lg px-3 py-2 z-20">
+              <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 z-20">
                 <p className="text-white text-sm">
                   {participants.length + 1} participants • {currentTime}
                 </p>
@@ -553,7 +542,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
               {!isMobile && selectedParticipantId && (
                 <button
                   onClick={swapVideos}
-                  className="absolute bottom-4 right-4 bg-gray-700 hover:bg-gray-600 rounded-full p-3 z-20 transition-colors"
+                  className="absolute bottom-4 right-4 bg-stone-700 hover:bg-stone-800 rounded-full p-3 z-20 transition-colors"
                   title="Swap main and picture-in-picture"
                 >
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -561,200 +550,65 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
                   </svg>
                 </button>
               )}
+
+              {/* Controls Overlay */}
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 mb-4 z-30">
+                <div className="flex items-center justify-center space-x-4 bg-white/80 backdrop-blur-md rounded-2xl px-6 py-3 shadow-lg border border-stone-200">
+                  <Button
+                    variant={isMuted ? "destructive" : "secondary"}
+                    size="lg"
+                    onClick={toggleMute}
+                    className="rounded-full h-12 w-12 bg-stone-100 hover:bg-stone-200 text-stone-700"
+                    disabled={!localStream}
+                  >
+                    {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                  </Button>
+
+                  <Button
+                    variant={isVideoOn ? "secondary" : "destructive"}
+                    size="lg"
+                    onClick={toggleVideo}
+                    className="rounded-full h-12 w-12 bg-stone-100 hover:bg-stone-200 text-stone-700"
+                    disabled={!localStream}
+                  >
+                    {isVideoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                  </Button>
+
+                  <Button variant="destructive" size="lg" className="rounded-full h-12 w-12" onClick={handleLeave}>
+                    <Phone className="h-5 w-5" />
+                  </Button>
+
+                  <Button variant="ghost" size="lg" className="rounded-full h-12 w-12 text-stone-600 hover:text-stone-900 hover:bg-stone-100">
+                    <MoreVertical className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          {/* Controls */}
-          <div className="bg-gray-800 p-4 flex items-center justify-center space-x-4">
-            <Button
-              variant={isMuted ? "destructive" : "secondary"}
-              size="lg"
-              onClick={toggleMute}
-              className="rounded-full h-12 w-12"
-              disabled={!localStream}
-            >
-              {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-            </Button>
-
-            <Button
-              variant={isVideoOn ? "secondary" : "destructive"}
-              size="lg"
-              onClick={toggleVideo}
-              className="rounded-full h-12 w-12"
-              disabled={!localStream}
-            >
-              {isVideoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-            </Button>
-
-            <Button variant="destructive" size="lg" className="rounded-full h-12 w-12" onClick={handleLeave}>
-              <Phone className="h-5 w-5" />
-            </Button>
-
-            <Button variant="ghost" size="lg" className="rounded-full h-12 w-12 text-gray-300 hover:text-white">
-              <MoreVertical className="h-5 w-5" />
-            </Button>
           </div>
         </div>
 
         {/* Sidebar */}
-        <div className={`${isMobile ? 'w-full h-64' : 'w-80'} bg-gray-800 ${isMobile ? 'border-t' : 'border-l'} border-gray-700 flex flex-col`}>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-2 bg-gray-700 m-2">
-              <TabsTrigger value="chat" className="flex items-center space-x-2">
-                <MessageCircle className="h-4 w-4" />
-                <span>Chat</span>
-              </TabsTrigger>
-              <TabsTrigger value="participants" className="flex items-center space-x-2">
-                <Users className="h-4 w-4" />
-                <span>People ({participants.length + 1})</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="chat" className="flex-1 flex flex-col m-2 mt-0">
-              <Card className="flex-1 flex flex-col bg-gray-700 border-gray-600">
-                <ScrollArea className="flex-1 p-4">
-                  <div className="space-y-4">
-                    {messages.map((message) => (
-                      <div key={message.id} className="flex space-x-3">
-                        <Avatar className="h-8 w-8 flex-shrink-0">
-                          <AvatarFallback className="text-xs bg-gray-600">
-                            {message.user
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm font-medium text-white">{message.user}</span>
-                            <span className="text-xs text-gray-400">{formatTime(message.timestamp)}</span>
-                          </div>
-                          <p className="text-sm text-gray-300 mt-1 break-words">{message.content}</p>
-                        </div>
-                      </div>
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </ScrollArea>
-
-                <div className="p-4 border-t border-gray-600">
-                  <div className="flex space-x-2">
-                    {hydrated && (
-                      <Input
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type a message..."
-                        className="flex-1 bg-gray-600 border-gray-500 text-white placeholder-gray-400"
-                        disabled={!isConnected}
-                      />
-                    )}
-                    <Button onClick={sendMessage} size="sm" disabled={!isConnected || !newMessage.trim()}>
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="participants" className="flex-1 m-2 mt-0">
-              <Card className="h-full bg-gray-700 border-gray-600">
-                <ScrollArea className="h-full p-4">
-                  <div className="space-y-3">
-                    {/* Current User */}
-                    <div className="flex items-center space-x-3 p-2 rounded-lg bg-gray-600">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-blue-600">
-                          {userName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-white truncate">{userName} (You)</span>
-                          <Badge variant="secondary" className="text-xs bg-blue-600 text-white">
-                            Host
-                          </Badge>
-                        </div>
-                        <div className="flex items-center space-x-1 mt-1">
-                          {isMuted ? (
-                            <MicOff className="h-3 w-3 text-red-400" />
-                          ) : (
-                            <Mic className="h-3 w-3 text-green-400" />
-                          )}
-                          {isVideoOn ? (
-                            <Video className="h-3 w-3 text-green-400" />
-                          ) : (
-                            <VideoOff className="h-3 w-3 text-red-400" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Other Participants */}
-                    {participants.map((participant) => (
-                      <div
-                        key={participant.id}
-                        className={`flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer ${selectedParticipantId === participant.id ? 'bg-blue-700' : ''}`}
-                        onClick={() => setSelectedParticipantId(participant.id)}
-                      >
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback>
-                            {participant.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium text-white truncate">{participant.name}</span>
-                          <div className="flex items-center space-x-1 mt-1">
-                            {participant.isMuted ? (
-                              <MicOff className="h-3 w-3 text-red-400" />
-                            ) : (
-                              <Mic className="h-3 w-3 text-green-400" />
-                            )}
-                            {participant.isVideoOn ? (
-                              <Video className="h-3 w-3 text-green-400" />
-                            ) : (
-                              <VideoOff className="h-3 w-3 text-red-400" />
-                            )}
-                          </div>
-                        </div>
-                        {/* Select to watch icon (not for self) */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="ml-1 p-1 h-7 w-7 text-gray-300 hover:text-blue-400"
-                          onClick={e => {
-                            e.stopPropagation();
-                            setSelectedParticipantId(participant.id);
-                            setIsMainVideoLocal(false);
-                          }}
-                          aria-label="Select to watch"
-                        >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                        </Button>
-                        {/* Mute/unmute button for remote participant */}
-                        <Button
-                          variant={mutedParticipants[participant.id] ? "destructive" : "secondary"}
-                          size="icon"
-                          className="ml-1 p-1 h-7 w-7"
-                          onClick={e => { e.stopPropagation(); handleMuteParticipant(participant.id); }}
-                          aria-label={mutedParticipants[participant.id] ? "Unmute participant" : "Mute participant"}
-                        >
-                          {mutedParticipants[participant.id] ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
+        <MeetingSidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          messages={messages}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          sendMessage={sendMessage}
+          handleKeyPress={handleKeyPress}
+          hydrated={hydrated}
+          isConnected={isConnected}
+          userName={userName}
+          isHost={isHost}
+          isMuted={isMuted}
+          isVideoOn={isVideoOn}
+          participants={participants}
+          selectedParticipantId={selectedParticipantId}
+          setSelectedParticipantId={setSelectedParticipantId}
+          mutedParticipants={mutedParticipants}
+          hostName={hostName}
+        />
       </div>
-    </div> // <-- Add this closing tag for the top-level div
+    </div>
   )
 }

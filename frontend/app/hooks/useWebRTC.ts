@@ -36,7 +36,6 @@ const ICE_SERVERS = {
 }
 
 export function useWebRTC(
-  roomId: string,
   userName: string,
   sendJsonMessage: (message: object) => void,
 ) {
@@ -279,7 +278,6 @@ export function useWebRTC(
       // Polite peer logic variables
       const polite = isPoliteWith(senderName)
       const makingOffer = makingOfferRef.current.get(senderId) || false
-      const ignoreOffer = ignoreOfferRef.current.get(senderId) || false
 
       try {
         if (type === "offer") {

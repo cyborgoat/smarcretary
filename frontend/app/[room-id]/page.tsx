@@ -10,5 +10,18 @@ export default function RoomPage({ params }: { params: Promise<{ "room-id": stri
   const searchParams = useSearchParams();
   const userName = searchParams.get("name") || "Guest";
 
-  return <MeetingRoom roomId={roomId} userName={userName} onLeave={() => { window.location.href = "/"; }} />;
+  const handleLeave = () => {
+    // Smooth transition back to home
+    window.location.href = "/";
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-stone-50 to-stone-100">
+      <MeetingRoom 
+        roomId={roomId} 
+        userName={userName} 
+        onLeave={handleLeave} 
+      />
+    </div>
+  );
 }
