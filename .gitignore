@@ -169,3 +169,9 @@ build/
 dist/
 *.egg-info/
 *.egg
+
+# Model binary files
+*.pt
+*.onnx
+*.onnx.gz
+*.onnx.gz.part*
