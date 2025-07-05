@@ -20,7 +20,7 @@ export default function HomePage() {
       <div className="w-full max-w-md px-6">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-light text-stone-900 mb-2">Smart Secretary</h1>
+          <h1 className="text-4xl font-light text-stone-900 mb-2">Smartcretary</h1>
           <p className="text-stone-600 text-sm">Connect and collaborate seamlessly</p>
         </div>
 
