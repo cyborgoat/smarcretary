@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+Caddyfile
 
 # debug
 npm-debug.log*
@@ -32,6 +33,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +41,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SSL certificates
+*.pem
+*.crt
+*.key
+*.p12
+*.pfx

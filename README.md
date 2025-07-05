@@ -1,6 +1,13 @@
 # Smart Secretary - WebRTC Video Conferencing
 
-A real-time video conferencing application built with Next.js frontend and FastAPI backend, featuring WebRTC peer-to-peer connections and WebSocket signaling.
+A modern, real-time video conferencing application built with Next.js (frontend) and FastAPI (backend), featuring:
+
+- WebRTC peer-to-peer video/audio
+- WebSocket signaling
+- Secure HTTPS/WSS for network access
+- Modern UI with shadcn/ui components
+
+---
 
 ## 🚀 Quick Start
 
@@ -13,244 +20,202 @@ A real-time video conferencing application built with Next.js frontend and FastA
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd smarcretary
    ```
 
 2. **Setup Backend**
+
    ```bash
    cd backend/smartcretary
    pip install -e .
    ```
 
 3. **Setup Frontend**
+
    ```bash
-   cd frontend
+   cd ../../frontend
    npm install
    ```
 
-4. **Configure for Network Access (Optional)**
+4. **Generate SSL Certificates (Required for Network Access)**
+
    ```bash
-   # Run from project root
+   cd backend/smartcretary
+   # Generate self-signed certificates for HTTPS/WSS
+   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"
+   
+   # For network access from other devices, also generate with your IP
+   # Replace YOUR_IP with your actual IP address
+   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
+     -subj "/CN=YOUR_IP" -addext "subjectAltName=DNS:localhost,IP:YOUR_IP,IP:127.0.0.1"
+   ```
+
+5. **Configure for Network Access**
+
+   ```bash
+   # Run from project root to auto-configure network settings
    ./setup-network.sh
+   
+   # Or manually update frontend/.env.local with your network IP:
+   # NEXT_PUBLIC_WS_URL=wss://YOUR_IP:8080/ws
+   # NEXT_PUBLIC_API_URL=https://YOUR_IP:8080
+   ```
+
+6. **Install Caddy (For HTTPS Frontend)**
+
+   ```bash
+   # macOS
+   brew install caddy
+   
+   # Ubuntu/Debian
+   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+   sudo apt update
+   sudo apt install caddy
    ```
 
 ### Running the Application
 
-#### Option 1: Local Development (Localhost Only)
+#### Localhost Only
 
 1. **Start Backend**
+
    ```bash
    cd backend/smartcretary
-   python run.py
+   python main.py
    ```
 
 2. **Start Frontend**
+
    ```bash
-   cd frontend
+   cd ../../frontend
    npm run dev
    ```
 
-3. **Access the application**
-   - Open http://localhost:3000
+3. **Access**: [http://localhost:3000](http://localhost:3000)
 
-#### Option 2: Network Access (Other Devices)
+#### Network Access (Other Devices)
 
-1. **Start Backend**
+1. **Start Backend (HTTPS)**
+
    ```bash
    cd backend/smartcretary
-   python run.py
+   python main.py
    ```
 
-2. **Start Frontend with HTTPS (for camera access)**
+2. **Start Frontend (HTTPS via Caddy)**
+
    ```bash
-   cd frontend
-   npm run dev:https
+   cd ../../frontend
+   npm run dev -- -p 3001
+   # In another terminal:
+   caddy run
    ```
 
-3. **Access the application**
-   - Local: https://localhost:3000
-   - Network: https://[YOUR-IP]:3000 (e.g., https://10.0.0.37:3000)
+3. **Access**: https://[YOUR-IP]:3000 (accept certificate warning)
 
-## 🔧 Troubleshooting
+---
 
-### WebSocket Connection Issues
+## 🖥️ Features
 
-**Problem**: "WebSocket connection failed" or "WebSocket is closed before connection is established"
+- Join/leave rooms, see yourself and selected participant's video
+- Audio and video transferred peer-to-peer
+- Volume control for each remote participant
+- Modern, accessible UI (shadcn/ui)
+- Chat and participant list
 
-**Solutions**:
-1. Ensure backend server is running on port 8080
-2. Check if port 8080 is available: `lsof -i :8080`
-3. Verify WebSocket URL in browser console
-4. Try refreshing the page
-5. Check firewall settings
-
-### Camera/Microphone Access Issues
-
-**Problem**: "Failed to access camera/microphone. Please check permissions."
-
-**Solutions**:
-1. **For localhost**: Grant camera/microphone permissions in browser
-2. **For network access**: Use HTTPS (required by browsers for security)
-   ```bash
-   cd frontend
-   npm run dev:https
-   ```
-3. **Accept self-signed certificate**: Click "Advanced" → "Proceed to [IP] (unsafe)"
-4. **Check device availability**: Ensure camera/microphone aren't used by other apps
-
-### Network Access Issues
-
-**Problem**: Other devices can't join the meeting
-
-**Solutions**:
-1. **Run network setup script**:
-   ```bash
-   ./setup-network.sh
-   ```
-
-2. **Manual configuration**:
-   - Update `frontend/.env.local` with your IP address
-   - Update backend CORS settings in `main.py`
-
-3. **Check network connectivity**:
-   ```bash
-   # Test from another device
-   curl http://[YOUR-IP]:8080/health
-   ```
-
-4. **Firewall configuration**:
-   - Ensure ports 3000 and 8080 are open
-   - Check router/firewall settings
-
-### Common Issues
-
-#### Backend Won't Start
-```bash
-# Check Python version
-python --version
-
-# Install dependencies
-cd backend/smartcretary
-pip install -e .
-
-# Check for port conflicts
-lsof -i :8080
-```
-
-#### Frontend Won't Start
-```bash
-# Clear npm cache
-npm cache clean --force
-
-# Reinstall dependencies
-rm -rf node_modules package-lock.json
-npm install
-
-# Check Node.js version
-node --version
-```
-
-#### HTTPS Certificate Warnings
-- This is normal for self-signed certificates
-- Click "Advanced" → "Proceed to [domain] (unsafe)"
-- Required for camera/microphone access from network devices
-
-## 🌐 Network Configuration
-
-### Automatic Setup
-```bash
-./setup-network.sh
-```
-
-### Manual Setup
-
-1. **Find your IP address**:
-   ```bash
-   ifconfig | grep "inet " | grep -v 127.0.0.1
-   ```
-
-2. **Update frontend environment**:
-   ```bash
-   # frontend/.env.local
-   NEXT_PUBLIC_WEBSOCKET_URL=ws://localhost:8080
-   NEXT_PUBLIC_WEBSOCKET_URL_NETWORK=ws://[YOUR-IP]:8080
-   NEXT_PUBLIC_API_URL=http://localhost:8080
-   NEXT_PUBLIC_API_URL_NETWORK=http://[YOUR-IP]:8080
-   ```
-
-3. **Update backend CORS settings**:
-   ```python
-   # backend/smartcretary/main.py
-   allow_origins=[
-       "http://localhost:3000",
-       "https://localhost:3000",
-       "http://[YOUR-IP]:3000",
-       "https://[YOUR-IP]:3000",
-   ]
-   ```
-
-## 🔐 Security Notes
-
-- **HTTPS Required**: Camera/microphone access requires HTTPS for network connections
-- **Self-signed Certificates**: Development uses self-signed certificates
-- **Local Network Only**: Current configuration is for local network access only
-- **No Authentication**: This is a development setup without user authentication
-
-## 📱 Usage
-
-1. **Create/Join Room**:
-   - Enter room ID and your name
-   - Click "Join Room"
-
-2. **Share Room**:
-   - Click "Share Room" to copy meeting link
-   - Send link to other participants
-
-3. **Controls**:
-   - Mute/unmute microphone
-   - Turn camera on/off
-   - Send chat messages
-   - View participants
+---
 
 ## 🛠 Development
 
 ### Architecture
-- **Frontend**: Next.js 15 with TypeScript
-- **Backend**: FastAPI with WebSocket support
-- **WebRTC**: Peer-to-peer connections for video/audio
-- **Signaling**: WebSocket for connection establishment
+
+- **Frontend**: Next.js with shadcn/ui components
+- **Backend**: FastAPI with WebSocket signaling
+- **WebRTC**: Peer-to-peer video/audio with STUN servers
 
 ### Key Files
-- `frontend/app/hooks/useWebRTC.ts` - WebRTC implementation
-- `frontend/app/hooks/useSocket.ts` - WebSocket client
-- `backend/smartcretary/main.py` - FastAPI server
-- `frontend/app/components/meeting-room.tsx` - Main UI component
 
-### Adding Features
-1. Fork the repository
-2. Create feature branch
-3. Implement changes
-4. Test locally and on network
-5. Submit pull request
+- Frontend: `frontend/app/components/meeting-room.tsx`, `frontend/app/hooks/useWebRTC.ts`, `frontend/app/hooks/useSocket.ts`
+- Backend: `backend/smartcretary/main.py`
+- UI: shadcn/ui components in `frontend/components/ui/`
+
+### HTTPS Certificate Setup Details
+
+WebRTC requires HTTPS for camera/microphone access from remote devices. Here's the complete setup:
+
+1. **Backend SSL Certificates**
+
+   ```bash
+   cd backend/smartcretary
+   # Basic localhost cert
+   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"
+   
+   # Network access cert (replace YOUR_IP with actual IP)
+   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
+     -subj "/CN=YOUR_IP" -addext "subjectAltName=DNS:localhost,IP:YOUR_IP,IP:127.0.0.1"
+   ```
+
+2. **Frontend HTTPS Proxy (Caddyfile)**
+
+   ```bash
+   cd frontend
+   # Create Caddyfile
+   echo "localhost:3000 {
+     tls internal
+     reverse_proxy localhost:3001
+   }" > Caddyfile
+   ```
+
+3. **Environment Configuration**
+
+   ```bash
+   # frontend/.env.local (created by setup-network.sh or manually)
+   NEXT_PUBLIC_WS_URL=wss://YOUR_IP:8080/ws
+   NEXT_PUBLIC_API_URL=https://YOUR_IP:8080
+   ```
+
+4. **Certificate Trust (For Development)**
+   - **Chrome/Edge**: Visit https://YOUR_IP:8080 and https://YOUR_IP:3000, click "Advanced" → "Proceed to site"
+   - **Safari**: Visit both URLs, click "Show Details" → "Visit Website"
+   - **Firefox**: Visit both URLs, click "Advanced" → "Accept Risk"
+
+---
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **Camera/Microphone Access Denied**
+   - Ensure HTTPS is used for network access
+   - Check browser permissions
+   - Try refreshing and allowing access
+
+2. **WebRTC Negotiation Errors**
+   - Fixed with negotiation guards in `useWebRTC.ts`
+   - Prevents simultaneous offer/answer creation
+
+3. **Certificate Warnings**
+   - Normal for self-signed certificates
+   - Accept in browser for testing
+   - Consider proper CA certificates for production
+
+4. **Network Access Issues**
+   - Check firewall: ports 3000, 8080 must be open
+   - Verify IP address in configuration
+   - Ensure all devices on same network
+
+5. **Audio/Video Not Working**
+   - Check browser console for errors
+   - Verify media permissions granted
+   - Test with simple localhost setup first
+
+---
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📞 Support
-
-For issues and questions:
-1. Check this README's troubleshooting section
-2. Look at browser console for error messages
-3. Check backend logs for WebSocket issues
-4. Create an issue with detailed error information 
+MIT

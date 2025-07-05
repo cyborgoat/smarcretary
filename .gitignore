@@ -175,3 +175,27 @@ dist/
 *.onnx
 *.onnx.gz
 *.onnx.gz.part*
+
+# SSL certificates (self-signed, development only)
+*.pem
+*.crt
+*.key
+*.p12
+*.pfx
+
+# HTTPS proxy configuration (development only)
+Caddyfile
+
+# Environment configuration files (contain sensitive data)
+.env.local
+.env.production
+.env.*.local
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

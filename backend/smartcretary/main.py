@@ -18,12 +18,15 @@ app = FastAPI(title="Smart Secretary WebRTC Backend", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000", 
+        "http://localhost:3000",
+        "https://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://10.0.0.37:3000",  # Local network IP
-        "https://localhost:3000",  # HTTPS support
         "https://127.0.0.1:3000",
+        "http://10.0.0.37:3000",
         "https://10.0.0.37:3000",
+        "http://[YOUR-IP]:3000",
+        "https://[YOUR-IP]:3000",
+        "*"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -254,4 +257,10 @@ async def get_room(room_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080) 
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8080,
+        ssl_keyfile="key.pem",
+        ssl_certfile="cert.pem"
+    )

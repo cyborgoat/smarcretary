@@ -49,6 +49,7 @@ export function useWebRTC(
 
   const localStreamRef = useRef<MediaStream | null>(null)
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map())
+  const negotiationInProgressRef = useRef<Map<string, boolean>>(new Map())
 
   const initializeMedia = useCallback(async () => {
     setIsConnecting(true)
@@ -185,12 +186,24 @@ export function useWebRTC(
       }
 
       peer.onnegotiationneeded = async () => {
+        if (negotiationInProgressRef.current.get(peerId)) {
+          // Negotiation already in progress for this peer, skip
+          return
+        }
+        negotiationInProgressRef.current.set(peerId, true)
         try {
+          // Only create offer if signaling state is stable
+          if (peer.signalingState !== "stable") {
+            negotiationInProgressRef.current.set(peerId, false)
+            return
+          }
           const offer = await peer.createOffer()
           await peer.setLocalDescription(offer)
           sendJsonMessage({ type: "offer", sdp: peer.localDescription, targetId: peerId, senderId: "current-user" })
         } catch (err) {
           console.error("Error creating offer:", err)
+        } finally {
+          negotiationInProgressRef.current.set(peerId, false)
         }
       }
 
@@ -224,14 +237,26 @@ export function useWebRTC(
       try {
         if (type === "offer") {
           if (sdp) {
-            await peer.setRemoteDescription(new RTCSessionDescription(sdp))
-            const answer = await peer.createAnswer()
-            await peer.setLocalDescription(answer)
-            sendJsonMessage({ type: "answer", sdp: peer.localDescription, targetId: senderId, senderId: "current-user" })
+            // Only set remote description if signaling state allows
+            if (peer.signalingState === "have-local-offer" || peer.signalingState === "stable") {
+              negotiationInProgressRef.current.set(senderId, true)
+              await peer.setRemoteDescription(new RTCSessionDescription(sdp))
+              const answer = await peer.createAnswer()
+              await peer.setLocalDescription(answer)
+              sendJsonMessage({ type: "answer", sdp: peer.localDescription, targetId: senderId, senderId: "current-user" })
+              negotiationInProgressRef.current.set(senderId, false)
+            } else {
+              console.warn("Cannot set remote offer in signaling state:", peer.signalingState)
+            }
           }
         } else if (type === "answer") {
           if (sdp) {
-            await peer.setRemoteDescription(new RTCSessionDescription(sdp))
+            // Only set remote answer if signaling state allows
+            if (peer.signalingState === "have-local-offer") {
+              await peer.setRemoteDescription(new RTCSessionDescription(sdp))
+            } else {
+              console.warn("Cannot set remote answer in signaling state:", peer.signalingState)
+            }
           }
         } else if (type === "candidate") {
           if (candidate) {
@@ -252,14 +277,19 @@ export function useWebRTC(
                 newPeer.addTrack(track, localStreamRef.current!)
               })
             }
-            const offer = await newPeer.createOffer()
-            await newPeer.setLocalDescription(offer)
-            sendJsonMessage({ type: "offer", sdp: newPeer.localDescription, targetId: senderId, senderId: "current-user" })
+            if (!negotiationInProgressRef.current.get(senderId)) {
+              negotiationInProgressRef.current.set(senderId, true)
+              const offer = await newPeer.createOffer()
+              await newPeer.setLocalDescription(offer)
+              sendJsonMessage({ type: "offer", sdp: newPeer.localDescription, targetId: senderId, senderId: "current-user" })
+              negotiationInProgressRef.current.set(senderId, false)
+            }
           }
         } else if (type === "participantLeft") {
           setParticipants((prev) => prev.filter((p) => p.id !== senderId))
           peersRef.current.get(senderId)?.close()
           peersRef.current.delete(senderId)
+          negotiationInProgressRef.current.delete(senderId)
         } else if (type === "toggleMute") {
           setParticipants((prev) =>
             prev.map((p) => (p.id === senderId ? { ...p, isMuted: signal.isMuted ?? p.isMuted } : p)),
@@ -271,6 +301,7 @@ export function useWebRTC(
         }
       } catch (err) {
         console.error("Error handling signal:", err)
+        negotiationInProgressRef.current.set(senderId, false)
       }
     },
     [createPeerConnection, sendJsonMessage],
@@ -286,10 +317,12 @@ export function useWebRTC(
     }
 
     // Close all peer connections
-    peersRef.current.forEach((peer) => {
+    peersRef.current.forEach((peer, peerId) => {
       peer.close()
+      negotiationInProgressRef.current.delete(peerId)
     })
     peersRef.current.clear()
+    negotiationInProgressRef.current.clear()
 
     setParticipants([])
     setIsMuted(false)
