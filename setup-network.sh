@@ -30,13 +30,18 @@ sed -i.bak "s/10\.0\.0\.37/$LOCAL_IP/g" run.py
 
 cd ../../
 
+# Generate backend SSL certificate and key
+cd backend
+
+echo "🔐 Generating backend SSL certificate and key..."
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=$LOCAL_IP"
+cd ..
+
 # Update frontend configuration
 echo "📝 Updating frontend configuration..."
 cd frontend
 
 # Update .env.local with the detected IP
-
-# For HTTPS, use wss:// instead of ws://
 cat > .env.local << EOF
 NEXT_PUBLIC_WS_URL=ws://localhost:8080
 NEXT_PUBLIC_WS_URL_NETWORK=ws://$LOCAL_IP:8080
@@ -47,6 +52,14 @@ NEXT_PUBLIC_API_URL_NETWORK=http://$LOCAL_IP:8080
 # NEXT_PUBLIC_WS_URL_NETWORK=wss://$LOCAL_IP:8080
 # NEXT_PUBLIC_API_URL=https://localhost:8080
 # NEXT_PUBLIC_API_URL_NETWORK=https://$LOCAL_IP:8080
+EOF
+
+# Generate Caddyfile for HTTPS reverse proxy
+cat > Caddyfile << EOF
+https://$LOCAL_IP:3000 {
+  tls internal
+  reverse_proxy localhost:3001
+}
 EOF
 
 cd ..
@@ -62,6 +75,7 @@ echo "🔧 To start the application:"
 echo "   1. Backend: cd backend/smartcretary && python run.py"
 echo "   2. Frontend: cd frontend && npm run dev"
 echo "   3. For HTTPS (camera access): cd frontend && npm run dev:https"
+echo "   4. Start Caddy: cd frontend && caddy run --config Caddyfile"
 echo ""
 echo "📱 Other devices can access the app using:"
 echo "   - http://$LOCAL_IP:3000 (HTTP - limited camera access)"
@@ -72,4 +86,4 @@ echo "   you'll need to use HTTPS. The browser will show a security"
 echo "   warning for self-signed certificates - click 'Advanced' and"
 echo "   'Proceed to $LOCAL_IP (unsafe)' to continue."
 echo ""
-echo "🎉 Setup complete! Happy video conferencing!" 
+echo "🎉 Setup complete! Happy video conferencing!"

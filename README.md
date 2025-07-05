@@ -16,209 +16,74 @@ A modern, real-time video conferencing application built with Next.js (frontend)
 - Python 3.8.1 or higher
 - Node.js 18 or higher
 - npm or yarn
+- (Recommended) Caddy for HTTPS frontend proxy: `brew install caddy`
 
-### Installation
+### 1. Clone the repository
 
-1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd smarcretary
+```
 
-   ```bash
-   git clone <repository-url>
-   cd smarcretary
-   ```
+### 2. Setup Backend
 
-2. **Setup Backend**
+```bash
+cd backend/smartcretary
+pip install -e .
+```
 
-   ```bash
-   cd backend/smartcretary
-   pip install -e .
-   ```
+### 3. Setup Frontend
 
-3. **Setup Frontend**
+```bash
+cd ../../frontend
+npm install
+```
 
-   ```bash
-   cd ../../frontend
-   npm install
-   ```
+### 4. Configure Network & SSL (Recommended)
 
-4. **Generate SSL Certificates (Required for Network Access)**
+Run the setup script to auto-configure your local IP, generate SSL certs, and create a Caddyfile:
 
-   ```bash
-   cd backend/smartcretary
-   # Generate self-signed certificates for HTTPS/WSS
-   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"
-   
-   # For network access from other devices, also generate with your IP
-   # Replace YOUR_IP with your actual IP address
-   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
-     -subj "/CN=YOUR_IP" -addext "subjectAltName=DNS:localhost,IP:YOUR_IP,IP:127.0.0.1"
-   ```
+```bash
+cd ..
+./setup-network.sh
+```
 
-5. **Configure for Network Access**
+- This will generate valid self-signed certs for your IP, update env files, and create a Caddyfile for HTTPS frontend.
+- If you want to do it manually, see below.
 
-   ```bash
-   # Run from project root to auto-configure network settings
-   ./setup-network.sh
-   
-   # Or manually update frontend/.env.local with your network IP:
-   # For HTTP (local):
-   # NEXT_PUBLIC_WS_URL=ws://localhost:8080
-   # NEXT_PUBLIC_WS_URL_NETWORK=ws://YOUR_IP:8080
-   # NEXT_PUBLIC_API_URL=http://localhost:8080
-   # NEXT_PUBLIC_API_URL_NETWORK=http://YOUR_IP:8080
-   # For HTTPS (network):
-   # NEXT_PUBLIC_WS_URL=wss://YOUR_IP:8080
-   # NEXT_PUBLIC_API_URL=https://YOUR_IP:8080
-   ```
+### 5. Start the Application
 
-6. **Install Caddy (For HTTPS Frontend)**
+#### Backend (HTTPS)
 
-   ```bash
-   # macOS
-   brew install caddy
-   
-   # Ubuntu/Debian
-   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-   sudo apt update
-   sudo apt install caddy
-   ```
+```bash
+cd backend/smartcretary
+python main.py
+# or
+smartcretary/.venv/bin/uvicorn smartcretary.main:app --host 0.0.0.0 --port 8080 --ssl-certfile=cert.pem --ssl-keyfile=key.pem
+```
 
-### Running the Application
+#### Frontend (HTTPS via Caddy)
 
-#### Localhost Only
+```bash
+cd ../../frontend
+PORT=3001 npm run dev
+# In another terminal:
+caddy run
+```
 
-1. **Start Backend**
+#### Access:
 
-   ```bash
-   cd backend/smartcretary
-   python main.py
-   ```
-
-2. **Start Frontend**
-
-   ```bash
-   cd ../../frontend
-   npm run dev
-   ```
-
-3. **Access**: [http://localhost:3000](http://localhost:3000)
-
-#### Network Access (Other Devices)
-
-1. **Start Backend (HTTPS)**
-
-   ```bash
-   cd backend/smartcretary
-   python main.py
-   ```
-
-2. **Start Frontend (HTTPS via Caddy)**
-
-   ```bash
-   cd ../../frontend
-   npm run dev -- -p 3001
-   # In another terminal:
-   caddy run
-   ```
-
-3. **Access**: https://[YOUR-IP]:3000 (accept certificate warning)
+- Local: https://localhost:3000
+- Network: https://YOUR_IP:3000 (accept certificate warning)
 
 ---
 
-## 🖥️ Features
+## 🛠️ Development & Troubleshooting
 
-- Join/leave rooms, see yourself and selected participant's video
-- Audio and video transferred peer-to-peer
-- Volume control for each remote participant
-- Modern, accessible UI (shadcn/ui)
-- Chat and participant list
-
----
-
-## 🛠 Development
-
-### Architecture
-
-- **Frontend**: Next.js with shadcn/ui components
-- **Backend**: FastAPI with WebSocket signaling
-- **WebRTC**: Peer-to-peer video/audio with STUN servers
-
-### Key Files
-
-- Frontend: `frontend/app/components/meeting-room.tsx`, `frontend/app/hooks/useWebRTC.ts`, `frontend/app/hooks/useSocket.ts`
-- Backend: `backend/smartcretary/main.py`
-- UI: shadcn/ui components in `frontend/components/ui/`
-
-### HTTPS Certificate Setup Details
-
-WebRTC requires HTTPS for camera/microphone access from remote devices. Here's the complete setup:
-
-1. **Backend SSL Certificates**
-
-   ```bash
-   cd backend/smartcretary
-   # Basic localhost cert
-   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"
-   
-   # Network access cert (replace YOUR_IP with actual IP)
-   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
-     -subj "/CN=YOUR_IP" -addext "subjectAltName=DNS:localhost,IP:YOUR_IP,IP:127.0.0.1"
-   ```
-
-2. **Frontend HTTPS Proxy (Caddyfile)**
-
-   ```bash
-   cd frontend
-   # Create Caddyfile
-   echo "localhost:3000 {
-     tls internal
-     reverse_proxy localhost:3001
-   }" > Caddyfile
-   ```
-
-3. **Environment Configuration**
-
-   ```bash
-   # frontend/.env.local (created by setup-network.sh or manually)
-   NEXT_PUBLIC_WS_URL=wss://YOUR_IP:8080/ws
-   NEXT_PUBLIC_API_URL=https://YOUR_IP:8080
-   ```
-
-4. **Certificate Trust (For Development)**
-   - **Chrome/Edge**: Visit https://YOUR_IP:8080 and https://YOUR_IP:3000, click "Advanced" → "Proceed to site"
-   - **Safari**: Visit both URLs, click "Show Details" → "Visit Website"
-   - **Firefox**: Visit both URLs, click "Advanced" → "Accept Risk"
-
----
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **Camera/Microphone Access Denied**
-   - Ensure HTTPS is used for network access
-   - Check browser permissions
-   - Try refreshing and allowing access
-
-2. **WebRTC Negotiation Errors**
-   - Fixed with negotiation guards in `useWebRTC.ts`
-   - Prevents simultaneous offer/answer creation
-
-3. **Certificate Warnings**
-   - Normal for self-signed certificates
-   - Accept in browser for testing
-   - Consider proper CA certificates for production
-
-4. **Network Access Issues**
-   - Check firewall: ports 3000, 8080 must be open
-   - Verify IP address in configuration
-   - Ensure all devices on same network
-
-5. **Audio/Video Not Working**
-   - Check browser console for errors
-   - Verify media permissions granted
-   - Test with simple localhost setup first
+- All configuration is handled by `setup-network.sh`.
+- For camera/mic on remote devices, always use HTTPS/WSS and accept the cert in your browser.
+- If you see WebSocket or certificate errors, ensure your cert was generated with the correct IP and is trusted in your OS/browser.
+- See backend and frontend README files for more details.
 
 ---
 
