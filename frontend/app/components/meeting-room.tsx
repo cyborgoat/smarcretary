@@ -479,49 +479,26 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
               </div>
               {/* PiP/Thumbnail: show only one mini video, same logic for mobile and desktop */}
               {(pipParticipant && pipIdx !== -1 && pipIdx !== mainIdx) && (
-                isMobile ? (
-                  <>{pipParticipant && (
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20" style={{ width: 80, height: 60 }}>
-                      <VideoThumbnail
-                        stream={pipParticipant.stream ?? undefined}
-                        name={pipParticipant.name}
-                        isMuted={pipParticipant.isMuted}
-                        isVideoOn={pipParticipant.isVideoOn}
-                        isLocal={pipParticipant.isLocal}
-                        onClick={() => {
-                          setIsMainVideoLocal(pipParticipant.isLocal)
-                          if (!pipParticipant.isLocal) setSelectedParticipantId(pipParticipant.id)
-                        }}
-                        selected={false}
-                        style={{ width: 80, height: 60 }}
-                      />
-                    </div>
-                  )}</>
-                ) : (
-                  <div
-                    ref={pipRef}
-                    className="absolute cursor-move bg-white/90 backdrop-blur-sm rounded-xl border-2 border-stone-300 shadow-lg"
-                    style={{
-                      left: pipPosition.x,
-                      top: pipPosition.y,
-                      width: 200,
-                      height: 150,
-                      zIndex: 10
-                    }}
-                    onMouseDown={handleMouseDown}
-                    onClick={swapVideos}
-                  >
-                    <VideoThumbnail
-                      stream={pipParticipant.stream ?? undefined}
-                      name={pipParticipant.name}
-                      isMuted={pipParticipant.isMuted}
-                      isVideoOn={pipParticipant.isVideoOn}
-                      isLocal={pipParticipant.isLocal}
-                      selected={false}
-                      style={{ width: 200, height: 150 }}
-                    />
-                  </div>
-                )
+                <div
+                  className={isMobile ? "absolute bottom-4 left-1/2 -translate-x-1/2 z-20" : "absolute cursor-move bg-white/90 backdrop-blur-sm rounded-xl border-2 border-stone-300 shadow-lg"}
+                  ref={isMobile ? undefined : pipRef}
+                  style={isMobile ? { width: 80, height: 60 } : { left: pipPosition.x, top: pipPosition.y, width: 200, height: 150, zIndex: 10 }}
+                  onMouseDown={isMobile ? undefined : handleMouseDown}
+                  onClick={() => {
+                    setIsMainVideoLocal(pipParticipant.isLocal)
+                    if (!pipParticipant.isLocal) setSelectedParticipantId(pipParticipant.id)
+                  }}
+                >
+                  <VideoThumbnail
+                    stream={pipParticipant.stream ?? undefined}
+                    name={pipParticipant.name}
+                    isMuted={pipParticipant.isMuted}
+                    isVideoOn={pipParticipant.isVideoOn}
+                    isLocal={pipParticipant.isLocal}
+                    selected={false}
+                    style={isMobile ? { width: 80, height: 60 } : { width: 200, height: 150 }}
+                  />
+                </div>
               )}
 
               {/* Meeting Info Overlay */}
@@ -532,11 +509,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
               </div>
               
               {/* Mute indicator */}
-              {isMuted && (
-                <div className="absolute top-4 right-4 bg-red-500 rounded-full p-2 z-20">
-                  <MicOff className="h-4 w-4 text-white" />
-                </div>
-              )}
+              {/* Only show mute indicator in VideoTile, not here to avoid duplicate icons */}
 
               {/* Swap button for desktop */}
               {!isMobile && selectedParticipantId && (

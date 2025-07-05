@@ -100,7 +100,9 @@ export default function MeetingSidebar({
   };
 
   return (
-    <div className={`w-80 bg-white/80 backdrop-blur-sm border-l border-stone-200/50 flex flex-col`}>
+    <div className={`$w-80 bg-white/80 backdrop-blur-sm border-l border-stone-200/50 flex flex-col$
+      ${typeof window !== 'undefined' && window.innerWidth < 768 ? 'w-full max-w-full border-l-0 border-t border-stone-200/50 fixed bottom-0 left-0 right-0 z-40 h-[50vh] min-h-[320px]' : 'w-80'}
+    `}>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <TabsList className="flex w-full min-w-0 px-2 py-1 gap-2 bg-stone-100 relative">
           <TabsTrigger value="chat" className="flex-1 min-w-0 flex items-center justify-center space-x-2 text-stone-700 relative truncate">
