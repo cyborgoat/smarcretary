@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import { useWebRTC } from "../hooks/useWebRTC"
 import { useSocket } from "../hooks/useSocket"
+import { VideoThumbnail } from "@/components/ui/VideoThumbnail"
 
 interface Message {
   id: string
@@ -63,6 +64,8 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
   const [pipPosition, setPipPosition] = useState({ x: 20, y: 20 })
   const [isDragging, setIsDragging] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [currentTime, setCurrentTime] = useState("");
+  const [hydrated, setHydrated] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -207,7 +210,9 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
 
   // Swap main and PiP video
   const swapVideos = () => {
-    setIsMainVideoLocal(!isMainVideoLocal)
+    // Only swap if there is a selected participant and at least one remote participant
+    if (!selectedParticipantId || participants.length === 0) return;
+    setIsMainVideoLocal((prev) => !prev);
   }
 
   // Handle PiP dragging
@@ -263,6 +268,124 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
       ))}
     </div>
   )
+
+  useEffect(() => {
+    const update = () => setCurrentTime(formatTime(new Date()));
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => { setHydrated(true); }, []);
+
+  // --- VideoTile: Generic video/participant tile for local or remote ---
+  function VideoTile({
+    stream,
+    name,
+    isMuted,
+    isVideoOn,
+    isLocal,
+    volume = 1,
+    muted = false,
+    onVolumeChange,
+    className = "",
+    style = {},
+    showVolume = false,
+  }: {
+    stream?: MediaStream
+    name: string
+    isMuted: boolean
+    isVideoOn: boolean
+    isLocal?: boolean
+    volume?: number
+    muted?: boolean
+    onVolumeChange?: (v: number) => void
+    className?: string
+    style?: React.CSSProperties
+    showVolume?: boolean
+  }) {
+    const videoRef = useRef<HTMLVideoElement>(null)
+    const audioRef = useRef<HTMLAudioElement>(null)
+
+    useEffect(() => {
+      if (stream && videoRef.current) {
+        videoRef.current.srcObject = stream
+      }
+      if (stream && audioRef.current && !isLocal) {
+        audioRef.current.srcObject = stream
+        audioRef.current.volume = volume ?? 1
+        audioRef.current.muted = muted ?? false
+      }
+    }, [stream, volume, muted, isLocal])
+
+    return (
+      <div className={`relative w-full h-full flex items-center justify-center ${className}`} style={style}>
+        {stream && isVideoOn ? (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={isLocal}
+            className="w-full h-full object-cover rounded-lg"
+            style={isLocal ? { transform: "scaleX(-1)" } : {}}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg">
+            <Avatar className="h-24 w-24 mx-auto mb-4">
+              <AvatarFallback className="text-2xl bg-gray-600">
+                {name.split(" ").map((n) => n[0]).join("").toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="absolute bottom-2 left-2 right-2 text-center text-white">
+              <h3 className="text-xl font-semibold">{name}</h3>
+              <p className="text-gray-300">Camera is off</p>
+            </div>
+          </div>
+        )}
+        {/* Audio for remote participant */}
+        {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
+        {/* Mute indicator */}
+        {isMuted && (
+          <div className="absolute top-2 right-2 bg-red-500 rounded-full p-1 z-20">
+            <MicOff className="h-4 w-4 text-white" />
+          </div>
+        )}
+        {/* Volume control overlay */}
+        {showVolume && onVolumeChange && !isLocal && (
+          <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 rounded-lg px-3 py-2 opacity-0 hover:opacity-100 transition-opacity">
+            <div className="flex items-center">
+              <label htmlFor="main-volume" className="text-xs text-white mr-2">Volume</label>
+              <input
+                id="main-volume"
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={volume}
+                onChange={e => onVolumeChange(Number(e.target.value))}
+                className="w-16"
+              />
+            </div>
+          </div>
+        )}
+        {/* Name overlay for PiP/thumbnail */}
+        <div className="absolute bottom-1 left-1 right-1 bg-black bg-opacity-50 rounded px-1 py-0.5">
+          <p className="text-white text-xs truncate">{name}{isLocal ? " (You)" : ""}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // --- Refactored main video and PiP logic ---
+  // Helper to get main and PiP participant info
+  const allParticipants = [
+    { id: "local", name: userName, isMuted, isVideoOn, stream: localStream, isLocal: true },
+    ...participants.map(p => ({ ...p, isLocal: false }))
+  ]
+  const mainIdx = isMainVideoLocal ? 0 : allParticipants.findIndex(p => p.id === selectedParticipantId)
+  const pipIdx = isMainVideoLocal ? allParticipants.findIndex(p => p.id === selectedParticipantId) : 0
+  const mainParticipant = allParticipants[mainIdx]
+  const pipParticipant = allParticipants[pipIdx]
 
   return (
     <div className="h-screen bg-gray-900 flex flex-col">
@@ -350,136 +473,72 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
           {/* Video Grid */}
           <div className="flex-1 p-4 relative">
             <div className="h-full bg-gray-800 rounded-lg relative overflow-hidden flex items-center justify-center">
-              {/* Main Video (Local by default, can be swapped) */}
-              {isMainVideoLocal ? (
-                // Local video as main
-                <div className="relative w-full h-full flex items-center justify-center">
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover rounded-lg"
-                    style={{ transform: "scaleX(-1)" }}
-                  />
-                  {!isVideoOn && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
-                      <div className="text-center text-white">
-                        <Avatar className="h-24 w-24 mx-auto mb-4">
-                          <AvatarFallback className="text-2xl bg-gray-600">
-                            {userName.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <h3 className="text-xl font-semibold">{userName}</h3>
-                        <p className="text-gray-300">Camera is off</p>
-                      </div>
+              {/* Main Video (local or selected participant) - unified for mobile and desktop */}
+              <div className="w-full max-w-full h-full max-h-[70vh] aspect-[16/9] mx-auto flex items-center justify-center">
+                <VideoTile
+                  stream={mainParticipant.stream ?? undefined}
+                  name={mainParticipant.name}
+                  isMuted={mainParticipant.isMuted}
+                  isVideoOn={mainParticipant.isVideoOn}
+                  isLocal={mainParticipant.isLocal}
+                  volume={mainParticipant.isLocal ? 1 : participantVolumes[mainParticipant.id] ?? 1}
+                  muted={mainParticipant.isLocal ? true : mutedParticipants[mainParticipant.id]}
+                  onVolumeChange={mainParticipant.isLocal ? undefined : v => setParticipantVolumes(vols => ({ ...vols, [mainParticipant.id]: v }))}
+                  showVolume={!mainParticipant.isLocal}
+                  className="w-full h-full"
+                />
+              </div>
+              {/* PiP/Thumbnail: show only one mini video, same logic for mobile and desktop */}
+              {(pipParticipant && pipIdx !== -1 && pipIdx !== mainIdx) && (
+                isMobile ? (
+                  <>{pipParticipant && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20" style={{ width: 80, height: 60 }}>
+                      <VideoThumbnail
+                        stream={pipParticipant.stream ?? undefined}
+                        name={pipParticipant.name}
+                        isMuted={pipParticipant.isMuted}
+                        isVideoOn={pipParticipant.isVideoOn}
+                        isLocal={pipParticipant.isLocal}
+                        onClick={() => {
+                          setIsMainVideoLocal(pipParticipant.isLocal)
+                          if (!pipParticipant.isLocal) setSelectedParticipantId(pipParticipant.id)
+                        }}
+                        selected={false}
+                        style={{ width: 80, height: 60 }}
+                      />
                     </div>
-                  )}
-                </div>
-              ) : (
-                // Selected participant as main
-                selectedParticipantId && (
-                  <MainParticipantVideo
-                    participant={participants.find(p => p.id === selectedParticipantId)!}
-                    volume={participantVolumes[selectedParticipantId] ?? 1}
-                    onVolumeChange={v => setParticipantVolumes(vols => ({ ...vols, [selectedParticipantId]: v }))}
-                    muted={mutedParticipants[selectedParticipantId]}
-                  />
+                  )}</>
+                ) : (
+                  <div
+                    ref={pipRef}
+                    className="absolute cursor-move bg-gray-900 rounded-lg border-2 border-gray-600 shadow-lg"
+                    style={{
+                      left: pipPosition.x,
+                      top: pipPosition.y,
+                      width: 200,
+                      height: 150,
+                      zIndex: 10
+                    }}
+                    onMouseDown={handleMouseDown}
+                    onClick={swapVideos}
+                  >
+                    <VideoThumbnail
+                      stream={pipParticipant.stream ?? undefined}
+                      name={pipParticipant.name}
+                      isMuted={pipParticipant.isMuted}
+                      isVideoOn={pipParticipant.isVideoOn}
+                      isLocal={pipParticipant.isLocal}
+                      selected={false}
+                      style={{ width: 200, height: 150 }}
+                    />
+                  </div>
                 )
-              )}
-              
-              {/* Picture-in-Picture (draggable) */}
-              {!isMobile && (isMainVideoLocal ? selectedParticipantId : true) && (
-                <div
-                  ref={pipRef}
-                  className="absolute cursor-move bg-gray-900 rounded-lg border-2 border-gray-600 shadow-lg"
-                  style={{
-                    left: pipPosition.x,
-                    top: pipPosition.y,
-                    width: 200,
-                    height: 150,
-                    zIndex: 10
-                  }}
-                  onMouseDown={handleMouseDown}
-                  onClick={swapVideos}
-                >
-                  {isMainVideoLocal ? (
-                    // Show selected participant in PiP
-                    selectedParticipantId && (
-                      <PipParticipantVideo
-                        participant={participants.find(p => p.id === selectedParticipantId)!}
-                      />
-                    )
-                  ) : (
-                    // Show local video in PiP
-                    <div className="relative w-full h-full">
-                      <video
-                        autoPlay
-                        muted
-                        playsInline
-                        className="w-full h-full object-cover rounded-lg"
-                        style={{ transform: "scaleX(-1)" }}
-                        ref={(el) => {
-                          if (el && localStream) el.srcObject = localStream
-                        }}
-                      />
-                      {!isVideoOn && (
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center rounded-lg">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs bg-gray-600">
-                              {userName.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Mobile layout - show thumbnails at bottom */}
-              {isMobile && participants.length > 0 && (
-                <div className="absolute bottom-4 left-4 right-4 flex gap-2 overflow-x-auto">
-                  {participants.map((participant) => (
-                    <div
-                      key={participant.id}
-                      className={`flex-shrink-0 border-2 rounded-lg cursor-pointer ${selectedParticipantId === participant.id ? 'border-blue-500' : 'border-gray-600'}`}
-                      onClick={() => {
-                        setSelectedParticipantId(participant.id)
-                        if (!isMainVideoLocal) return // If participant is already main, just select
-                        // If local is main, swap to show participant
-                        setIsMainVideoLocal(false)
-                      }}
-                      style={{ width: 64, height: 48 }}
-                    >
-                      <video
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }}
-                        ref={el => {
-                          if (el && participant.stream) el.srcObject = participant.stream
-                        }}
-                        autoPlay
-                        playsInline
-                        muted
-                        hidden={!participant.isVideoOn}
-                      />
-                      {!participant.isVideoOn && (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-700 rounded-lg">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs">
-                              {participant.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
               )}
 
               {/* Meeting Info Overlay */}
               <div className="absolute top-4 left-4 bg-black bg-opacity-50 rounded-lg px-3 py-2 z-20">
                 <p className="text-white text-sm">
-                  {participants.length + 1} participants • {formatTime(new Date())}
+                  {participants.length + 1} participants • {currentTime}
                 </p>
               </div>
               
@@ -581,14 +640,16 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
 
                 <div className="p-4 border-t border-gray-600">
                   <div className="flex space-x-2">
-                    <Input
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Type a message..."
-                      className="flex-1 bg-gray-600 border-gray-500 text-white placeholder-gray-400"
-                      disabled={!isConnected}
-                    />
+                    {hydrated && (
+                      <Input
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Type a message..."
+                        className="flex-1 bg-gray-600 border-gray-500 text-white placeholder-gray-400"
+                        disabled={!isConnected}
+                      />
+                    )}
                     <Button onClick={sendMessage} size="sm" disabled={!isConnected || !newMessage.trim()}>
                       <Send className="h-4 w-4" />
                     </Button>
@@ -661,11 +722,25 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
                             )}
                           </div>
                         </div>
+                        {/* Select to watch icon (not for self) */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="ml-1 p-1 h-7 w-7 text-gray-300 hover:text-blue-400"
+                          onClick={e => {
+                            e.stopPropagation();
+                            setSelectedParticipantId(participant.id);
+                            setIsMainVideoLocal(false);
+                          }}
+                          aria-label="Select to watch"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        </Button>
                         {/* Mute/unmute button for remote participant */}
                         <Button
                           variant={mutedParticipants[participant.id] ? "destructive" : "secondary"}
                           size="icon"
-                          className="ml-2"
+                          className="ml-1 p-1 h-7 w-7"
                           onClick={e => { e.stopPropagation(); handleMuteParticipant(participant.id); }}
                           aria-label={mutedParticipants[participant.id] ? "Unmute participant" : "Mute participant"}
                         >
@@ -680,98 +755,6 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
           </Tabs>
         </div>
       </div>
-    </div>
-  )
-}
-
-// Main participant video for full screen
-function MainParticipantVideo({ participant, volume, onVolumeChange, muted }: { 
-  participant: Participant, 
-  volume: number, 
-  onVolumeChange: (v: number) => void, 
-  muted?: boolean 
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const audioRef = useRef<HTMLAudioElement>(null)
-
-  useEffect(() => {
-    if (participant.stream && videoRef.current) {
-      videoRef.current.srcObject = participant.stream
-    }
-    if (participant.stream && audioRef.current) {
-      audioRef.current.srcObject = participant.stream
-      audioRef.current.volume = volume
-      audioRef.current.muted = !!muted
-    }
-  }, [participant.stream, volume, muted])
-
-  return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      {participant.stream && participant.isVideoOn ? (
-        <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover rounded-lg" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
-          <div className="text-center text-white">
-            <Avatar className="h-24 w-24 mx-auto mb-4">
-              <AvatarFallback className="text-2xl bg-gray-600">
-                {participant.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <h3 className="text-xl font-semibold">{participant.name}</h3>
-            <p className="text-gray-300">Camera is off</p>
-          </div>
-        </div>
-      )}
-      {/* Audio for remote participant */}
-      <audio ref={audioRef} autoPlay playsInline />
-      
-      {/* Volume control overlay - only show on hover */}
-      <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 rounded-lg px-3 py-2 opacity-0 hover:opacity-100 transition-opacity">
-        <div className="flex items-center">
-          <label htmlFor="main-volume" className="text-xs text-white mr-2">Volume</label>
-          <input
-            id="main-volume"
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            onChange={e => onVolumeChange(Number(e.target.value))}
-            className="w-16"
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Picture-in-picture participant video (small)
-function PipParticipantVideo({ participant }: { participant: Participant }) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  useEffect(() => {
-    if (participant.stream && videoRef.current) {
-      videoRef.current.srcObject = participant.stream
-    }
-  }, [participant.stream])
-
-  return (
-    <div className="relative w-full h-full">
-      {participant.stream && participant.isVideoOn ? (
-        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-lg" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="text-xs bg-gray-600">
-              {participant.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-      )}
-      {/* Participant name overlay */}
-      <div className="absolute bottom-1 left-1 right-1 bg-black bg-opacity-50 rounded px-1 py-0.5">
-        <p className="text-white text-xs truncate">{participant.name}</p>
-      </div>
-    </div>
+    </div> // <-- Add this closing tag for the top-level div
   )
 }

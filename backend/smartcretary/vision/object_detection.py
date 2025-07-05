@@ -1,6 +1,7 @@
 import cv2
 from ultralytics import YOLO
 import math
+from fastapi import APIRouter
 
 # --- Configuration ---
 # You can choose different YOLOv8 models like:
@@ -13,6 +14,16 @@ MODEL_PATH = 'yolov8n.pt'
 CONFIDENCE_THRESHOLD = 0.5
 BOX_COLOR = (255, 0, 255) # BGR format for OpenCV (Magenta)
 TEXT_COLOR = (255, 255, 255) # White
+
+router = APIRouter()
+
+# Example endpoint (to be implemented)
+# @router.post("/vision/detect")
+# async def detect_objects(...):
+#     ...
+
+# Placeholder for vision AI (object detection, etc.)
+# Move your vision code here
 
 def main():
     """

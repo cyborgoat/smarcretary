@@ -50,6 +50,22 @@ export function useWebRTC(
   const localStreamRef = useRef<MediaStream | null>(null)
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map())
   const negotiationInProgressRef = useRef<Map<string, boolean>>(new Map())
+  // Map to store pending ICE candidates for each peer
+  const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map())
+  // Map to store pending answers for each peer
+  const pendingAnswerRef = useRef<Map<string, RTCSessionDescriptionInit[]>>(new Map())
+
+  // Polite peer logic: assign polite/impolite role per peer
+  // Returns true if current user is polite with respect to peerId/peerName
+  const isPoliteWith = useCallback((peerName: string) => {
+    // Lexicographical order: lower name is polite
+    return userName < peerName
+  }, [userName])
+
+  // Track if we are making an offer for each peer
+  const makingOfferRef = useRef<Map<string, boolean>>(new Map())
+  // Track if we are ignoring offers due to collision
+  const ignoreOfferRef = useRef<Map<string, boolean>>(new Map())
 
   const initializeMedia = useCallback(async () => {
     setIsConnecting(true)
@@ -96,8 +112,12 @@ export function useWebRTC(
       // Add tracks to existing peers if they are already connected
       peersRef.current.forEach((peer) => {
         stream.getTracks().forEach((track) => {
-          peer.addTrack(track, stream)
-        })
+          // Only add track if not already added
+          const hasSender = peer.getSenders().some(sender => sender.track && sender.track.id === track.id);
+          if (!hasSender) {
+            peer.addTrack(track, stream);
+          }
+        });
       })
     } catch (err) {
       console.error("Error accessing media devices:", err)
@@ -166,17 +186,47 @@ export function useWebRTC(
         }
       }
 
+      // Add connection state logging for debugging
+      peer.onconnectionstatechange = () => {
+        console.log(`Peer ${peerId} connectionState:`, peer.connectionState)
+      }
+      peer.oniceconnectionstatechange = () => {
+        console.log(`Peer ${peerId} iceConnectionState:`, peer.iceConnectionState)
+      }
+      peer.onsignalingstatechange = () => {
+        console.log(`Peer ${peerId} signalingState:`, peer.signalingState)
+        // If we have a queued answer and now in 'have-remote-offer', process it
+        const pendingAnswers = pendingAnswerRef.current.get(peerId) || []
+        if (peer.signalingState === "have-remote-offer" && pendingAnswers.length > 0) {
+          const answerSDP = pendingAnswers.shift()
+          if (answerSDP) {
+            (async () => {
+              try {
+                console.log(`[WebRTC] Processing queued answer for ${peerId} in signalingState:`, peer.signalingState)
+                await peer.setLocalDescription(answerSDP)
+                sendJsonMessage({ type: "answer", sdp: peer.localDescription, targetId: peerId, senderId: "current-user" })
+              } catch (e) {
+                console.warn("[WebRTC] Error setting queued local answer:", e)
+              }
+            })()
+          }
+          pendingAnswerRef.current.set(peerId, pendingAnswers)
+        }
+      }
+
       peer.ontrack = (event) => {
         setParticipants((prevParticipants) => {
           const existingParticipant = prevParticipants.find((p) => p.id === peerId)
           if (existingParticipant) {
-            // Update existing participant's stream
-            const newParticipants = prevParticipants.map((p) =>
-              p.id === peerId ? { ...p, stream: event.streams[0] } : p,
-            )
-            return newParticipants
+            // Always update stream if changed
+            if (existingParticipant.stream !== event.streams[0]) {
+              return prevParticipants.map((p) =>
+                p.id === peerId ? { ...p, stream: event.streams[0] } : p,
+              )
+            }
+            return prevParticipants
           } else {
-            // Add new participant
+            // Add new participant with stream
             return [
               ...prevParticipants,
               { id: peerId, name: peerName, isMuted: false, isVideoOn: true, stream: event.streams[0] },
@@ -185,28 +235,21 @@ export function useWebRTC(
         })
       }
 
+      // Polite peer: listen for negotiationneeded
       peer.onnegotiationneeded = async () => {
-        if (negotiationInProgressRef.current.get(peerId)) {
-          // Negotiation already in progress for this peer, skip
-          return
-        }
-        negotiationInProgressRef.current.set(peerId, true)
         try {
-          // Only create offer if signaling state is stable
-          if (peer.signalingState !== "stable") {
-            negotiationInProgressRef.current.set(peerId, false)
-            return
-          }
+          makingOfferRef.current.set(peerId, true)
           const offer = await peer.createOffer()
           await peer.setLocalDescription(offer)
           sendJsonMessage({ type: "offer", sdp: peer.localDescription, targetId: peerId, senderId: "current-user" })
-        } catch (err) {
-          console.error("Error creating offer:", err)
+        } catch (e) {
+          console.warn("Negotiation needed error:", e)
         } finally {
-          negotiationInProgressRef.current.set(peerId, false)
+          makingOfferRef.current.set(peerId, false)
         }
       }
 
+      // Add all local tracks ONCE, immediately after creating the peer connection
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => {
           peer.addTrack(track, localStreamRef.current!)
@@ -224,7 +267,6 @@ export function useWebRTC(
       const { type, sdp, candidate, senderId, senderName } = signal
 
       if (!peersRef.current.has(senderId) && senderId !== "current-user") {
-        // Only create new peer connection if it doesn't exist and it's not self
         createPeerConnection(senderId, senderName)
       }
 
@@ -234,33 +276,101 @@ export function useWebRTC(
         return
       }
 
+      // Polite peer logic variables
+      const polite = isPoliteWith(senderName)
+      const makingOffer = makingOfferRef.current.get(senderId) || false
+      const ignoreOffer = ignoreOfferRef.current.get(senderId) || false
+
       try {
         if (type === "offer") {
           if (sdp) {
-            // Only set remote description if signaling state allows
-            if (peer.signalingState === "have-local-offer" || peer.signalingState === "stable") {
-              negotiationInProgressRef.current.set(senderId, true)
-              await peer.setRemoteDescription(new RTCSessionDescription(sdp))
-              const answer = await peer.createAnswer()
-              await peer.setLocalDescription(answer)
-              sendJsonMessage({ type: "answer", sdp: peer.localDescription, targetId: senderId, senderId: "current-user" })
-              negotiationInProgressRef.current.set(senderId, false)
-            } else {
-              console.warn("Cannot set remote offer in signaling state:", peer.signalingState)
+            const offerCollision =
+              (makingOffer || peer.signalingState !== "stable")
+            if (offerCollision) {
+              if (!polite) {
+                // Impolite peer ignores offer
+                ignoreOfferRef.current.set(senderId, true)
+                console.warn("Offer collision: impolite peer ignoring offer from", senderName)
+                return
+              }
+              // Polite peer accepts offer, rollback if needed
+              await peer.setLocalDescription({ type: "rollback" })
             }
+            ignoreOfferRef.current.set(senderId, false)
+            negotiationInProgressRef.current.set(senderId, true)
+            await peer.setRemoteDescription(new RTCSessionDescription(sdp))
+            // Wait until signalingState is 'have-remote-offer' before answering
+            let waitCount = 0
+            while (peer.signalingState !== "have-remote-offer" && waitCount < 10) {
+              await new Promise(res => setTimeout(res, 10))
+              waitCount++
+            }
+            if (peer.signalingState !== "have-remote-offer") {
+              console.warn("Peer not in 'have-remote-offer' state after setRemoteDescription, skipping answer. Current state:", peer.signalingState)
+              negotiationInProgressRef.current.set(senderId, false)
+              return
+            }
+            // Add any pending ICE candidates
+            const pending = pendingCandidatesRef.current.get(senderId) || []
+            for (const c of pending) {
+              try { await peer.addIceCandidate(new RTCIceCandidate(c)) } catch (e) { console.warn(e) }
+            }
+            pendingCandidatesRef.current.set(senderId, [])
+            // Only call setLocalDescription(answer) if in correct state
+            if (peer.signalingState === "have-remote-offer") {
+              const answer = await peer.createAnswer()
+              console.log(`[WebRTC] setLocalDescription(answer) for ${senderId} in signalingState:`, peer.signalingState)
+              try {
+                await peer.setLocalDescription(answer)
+                sendJsonMessage({ type: "answer", sdp: peer.localDescription, targetId: senderId, senderId: "current-user" })
+              } catch (e) {
+                if (peer.signalingState !== "have-remote-offer") {
+                  // Queue the answer for later
+                  console.warn(`[WebRTC] setLocalDescription(answer) failed in state ${peer.signalingState}, queuing answer for ${senderId}`)
+                  const pendingAnswers = pendingAnswerRef.current.get(senderId) || []
+                  pendingAnswers.push(answer)
+                  pendingAnswerRef.current.set(senderId, pendingAnswers)
+                } else {
+                  console.warn("[WebRTC] setLocalDescription(answer) error:", e)
+                }
+              }
+            } else {
+              console.warn("Not in 'have-remote-offer' state, skipping setLocalDescription(answer). Current state:", peer.signalingState)
+            }
+            negotiationInProgressRef.current.set(senderId, false)
           }
         } else if (type === "answer") {
           if (sdp) {
-            // Only set remote answer if signaling state allows
             if (peer.signalingState === "have-local-offer") {
               await peer.setRemoteDescription(new RTCSessionDescription(sdp))
+              // Add any pending ICE candidates
+              const pending = pendingCandidatesRef.current.get(senderId) || []
+              for (const c of pending) {
+                try { await peer.addIceCandidate(new RTCIceCandidate(c)) } catch (e) { console.warn(e) }
+              }
+              pendingCandidatesRef.current.set(senderId, [])
             } else {
               console.warn("Cannot set remote answer in signaling state:", peer.signalingState)
             }
           }
         } else if (type === "candidate") {
           if (candidate) {
-            await peer.addIceCandidate(new RTCIceCandidate(candidate))
+            if (
+              peer.remoteDescription && peer.remoteDescription.type &&
+              peer.connectionState !== "closed" &&
+              peer.signalingState !== "closed"
+            ) {
+              try {
+                await peer.addIceCandidate(new RTCIceCandidate(candidate))
+              } catch (e) {
+                console.warn("Error adding ICE candidate:", e)
+              }
+            } else {
+              // Queue candidate until remote description is set or peer is open
+              const pending = pendingCandidatesRef.current.get(senderId) || []
+              pending.push(candidate)
+              pendingCandidatesRef.current.set(senderId, pending)
+            }
           }
         } else if (type === "participantJoined") {
           if (senderId !== "current-user") {
@@ -270,14 +380,9 @@ export function useWebRTC(
               }
               return prev
             })
-            // Initiate offer to new participant
+            // Initiate offer to new participant (only if polite)
             const newPeer = createPeerConnection(senderId, senderName)
-            if (localStreamRef.current) {
-              localStreamRef.current.getTracks().forEach((track) => {
-                newPeer.addTrack(track, localStreamRef.current!)
-              })
-            }
-            if (!negotiationInProgressRef.current.get(senderId)) {
+            if (isPoliteWith(senderName) && !negotiationInProgressRef.current.get(senderId)) {
               negotiationInProgressRef.current.set(senderId, true)
               const offer = await newPeer.createOffer()
               await newPeer.setLocalDescription(offer)
@@ -290,6 +395,8 @@ export function useWebRTC(
           peersRef.current.get(senderId)?.close()
           peersRef.current.delete(senderId)
           negotiationInProgressRef.current.delete(senderId)
+          makingOfferRef.current.delete(senderId)
+          ignoreOfferRef.current.delete(senderId)
         } else if (type === "toggleMute") {
           setParticipants((prev) =>
             prev.map((p) => (p.id === senderId ? { ...p, isMuted: signal.isMuted ?? p.isMuted } : p)),
@@ -304,7 +411,7 @@ export function useWebRTC(
         negotiationInProgressRef.current.set(senderId, false)
       }
     },
-    [createPeerConnection, sendJsonMessage],
+    [createPeerConnection, sendJsonMessage, isPoliteWith],
   )
 
   const cleanup = useCallback(() => {
