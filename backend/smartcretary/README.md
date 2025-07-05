@@ -27,16 +27,21 @@ It is built with FastAPI and provides WebSocket signaling and REST APIs for real
 2. **Generate self-signed SSL certificates** (if not already present):
 
    ```bash
-   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=localhost"
+   # Use setup-network.sh from the project root for best results
+   # Or manually:
+   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
+     -subj "/CN=YOUR_IP" -addext "subjectAltName=IP:YOUR_IP"
    ```
 
-3. **Run the backend server**
+3. **Run the backend server (HTTPS)**
 
    ```bash
    python main.py
+   # or
+   smartcretary/.venv/bin/uvicorn smartcretary.main:app --host 0.0.0.0 --port 8080 --ssl-certfile=cert.pem --ssl-keyfile=key.pem
    ```
 
-   The server will be available at `https://0.0.0.0:8080`.
+   The server will be available at `https://YOUR_IP:8080`.
 
 ## Endpoints
 
@@ -48,7 +53,7 @@ It is built with FastAPI and provides WebSocket signaling and REST APIs for real
 
 ## Network Access
 
-- Make sure to accept the self-signed certificate in your browser for HTTPS/WSS to work.
+- Accept the self-signed certificate in your browser for HTTPS/WSS to work.
 - Ensure ports 8080 (backend) and 3000 (frontend) are open on your firewall.
 
 ## Development
