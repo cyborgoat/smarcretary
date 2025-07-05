@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Smart Secretary Network Setup Script
+# This script helps configure the application for network access
+
+echo "🚀 Smart Secretary Network Setup"
+echo "================================"
+
+# Get the local IP address
+LOCAL_IP=$(ifconfig | grep -E "inet.*broadcast" | grep -v "127.0.0.1" | awk '{print $2}' | head -1)
+
+if [ -z "$LOCAL_IP" ]; then
+    echo "❌ Could not detect local IP address"
+    echo "Please check your network connection and try again"
+    exit 1
+fi
+
+echo "🔍 Detected local IP address: $LOCAL_IP"
+
+# Update backend configuration
+echo "📝 Updating backend configuration..."
+cd backend/smartcretary
+
+# Update the main.py file with the detected IP
+sed -i.bak "s/\"http:\/\/10\.0\.0\.37:3000\"/\"http:\/\/$LOCAL_IP:3000\"/g" main.py
+sed -i.bak "s/\"https:\/\/10\.0\.0\.37:3000\"/\"https:\/\/$LOCAL_IP:3000\"/g" main.py
+
+# Update run.py with the detected IP
+sed -i.bak "s/10\.0\.0\.37/$LOCAL_IP/g" run.py
+
+cd ../../
+
+# Update frontend configuration
+echo "📝 Updating frontend configuration..."
+cd frontend
+
+# Update .env.local with the detected IP
+cat > .env.local << EOF
+NEXT_PUBLIC_WEBSOCKET_URL=ws://localhost:8080
+NEXT_PUBLIC_WEBSOCKET_URL_NETWORK=ws://$LOCAL_IP:8080
+NEXT_PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_API_URL_NETWORK=http://$LOCAL_IP:8080
+EOF
+
+cd ..
+
+echo "✅ Configuration updated successfully!"
+echo ""
+echo "🌐 Your application will be accessible at:"
+echo "   - Local: http://localhost:3000"
+echo "   - Network: http://$LOCAL_IP:3000"
+echo "   - HTTPS (for camera): https://localhost:3000"
+echo ""
+echo "🔧 To start the application:"
+echo "   1. Backend: cd backend/smartcretary && python run.py"
+echo "   2. Frontend: cd frontend && npm run dev"
+echo "   3. For HTTPS (camera access): cd frontend && npm run dev:https"
+echo ""
+echo "📱 Other devices can access the app using:"
+echo "   - http://$LOCAL_IP:3000 (HTTP - limited camera access)"
+echo "   - https://$LOCAL_IP:3000 (HTTPS - full camera access)"
+echo ""
+echo "⚠️  Note: For camera/microphone access from other devices,"
+echo "   you'll need to use HTTPS. The browser will show a security"
+echo "   warning for self-signed certificates - click 'Advanced' and"
+echo "   'Proceed to $LOCAL_IP (unsafe)' to continue."
+echo ""
+echo "🎉 Setup complete! Happy video conferencing!" 
