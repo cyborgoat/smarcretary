@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 from typing import Dict, Optional
+
 from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
@@ -41,13 +42,23 @@ class ConnectionManager:
                 if websocket.client_state.name == "CONNECTED":
                     await websocket.send_text(json.dumps(message))
                 else:
-                    logger.warning(f"WebSocket for {user_id} is not connected, removing from active connections")
+                    logger.warning(
+                        "WebSocket for %s is not connected, removing from active connections",
+                        user_id,
+                    )
                     self.disconnect(user_id)
             except Exception as e:
-                logger.error(f"Error sending message to {user_id}: {e}, removing from active connections", exc_info=True)
+                logger.error(
+                    "Error sending message to %s: %s, removing from active connections",
+                    user_id,
+                    e,
+                    exc_info=True,
+                )
                 self.disconnect(user_id)
 
-    async def broadcast_to_room(self, message: dict, room_id: str, exclude_user: Optional[str] = None):
+    async def broadcast_to_room(
+        self, message: dict, room_id: str, exclude_user: Optional[str] = None
+    ):
         if room_id in self.rooms:
             for participant_id, participant in self.rooms[room_id].participants.items():
                 if participant_id != exclude_user:

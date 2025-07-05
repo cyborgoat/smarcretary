@@ -1,7 +1,8 @@
-import cv2
-from ultralytics import YOLO
 import math
+
+import cv2
 from fastapi import APIRouter
+from ultralytics import YOLO
 
 # --- Configuration ---
 # You can choose different YOLOv8 models like:
@@ -81,21 +82,37 @@ def main():
                     # Get class ID and name
                     cls_id = int(box.cls[0])
                     class_name = class_names.get(cls_id, "Unknown")
-                    
+
                     # --- Draw the bounding box ---
                     cv2.rectangle(frame, (x1, y1), (x2, y2), BOX_COLOR, 2)
 
                     # --- Prepare and draw the label ---
                     label = f"{class_name}: {confidence:.2f}"
-                    
+
                     # Calculate text size to create a background rectangle
-                    (text_width, text_height), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                    
+                    (text_width, text_height), baseline = cv2.getTextSize(
+                        label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                    )
+
                     # Label background
-                    cv2.rectangle(frame, (x1, y1 - text_height - 10), (x1 + text_width, y1), BOX_COLOR, -1)
-                    
+                    cv2.rectangle(
+                        frame,
+                        (x1, y1 - text_height - 10),
+                        (x1 + text_width, y1),
+                        BOX_COLOR,
+                        -1,
+                    )
+
                     # Label text
-                    cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, TEXT_COLOR, 2)
+                    cv2.putText(
+                        frame,
+                        label,
+                        (x1, y1 - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        TEXT_COLOR,
+                        2,
+                    )
 
 
         # 6. Display the resulting frame

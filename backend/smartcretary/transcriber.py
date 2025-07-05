@@ -1,15 +1,15 @@
+import os
+import queue
+import tempfile
+import threading
 import tkinter as tk
 from tkinter import scrolledtext
-import threading
-import queue
-import requests
-import json
-import whisper
-import sounddevice as sd
-from scipy.io.wavfile import write
+
 import numpy as np
-import tempfile
-import os
+import requests
+import sounddevice as sd
+import whisper
+from scipy.io.wavfile import write
 
 
 class SpeechToTextApp:
@@ -131,7 +131,11 @@ class SpeechToTextApp:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmpfile:
                 write(tmpfile.name, self.fs, audio_np)
                 self.temp_wav_path = tmpfile.name
-            threading.Thread(target=self.transcribe_audio, args=(self.temp_wav_path,), daemon=True).start()
+            threading.Thread(
+                target=self.transcribe_audio,
+                args=(self.temp_wav_path,),
+                daemon=True,
+            ).start()
         else:
             self.update_status("No audio recorded.", "black")
 
@@ -147,7 +151,9 @@ class SpeechToTextApp:
 
     def summarize_text(self, text_to_summarize):
         try:
-            prompt = f"Please provide a concise summary of the following text:\n\n{text_to_summarize}"
+            prompt = (
+                f"Please provide a concise summary of the following text:\n\n{text_to_summarize}"
+            )
             payload = {
                 "model": self.ollama_model,
                 "prompt": prompt,

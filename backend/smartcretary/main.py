@@ -1,6 +1,9 @@
 import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from smartcretary.signaling.routes import router as signaling_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +31,6 @@ app.add_middleware(
 )
 
 # --- WebRTC Signaling & Room Management ---
-from smartcretary.signaling.routes import router as signaling_router
 app.include_router(signaling_router)
 
 # --- Vision AI Endpoints (future) ---

@@ -1,9 +1,11 @@
-import uuid
 import asyncio
-import logging
 import json
+import logging
+import uuid
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
+
 from .manager import ConnectionManager
 
 logger = logging.getLogger(__name__)
