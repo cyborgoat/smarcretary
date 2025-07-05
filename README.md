@@ -60,7 +60,13 @@ A modern, real-time video conferencing application built with Next.js (frontend)
    ./setup-network.sh
    
    # Or manually update frontend/.env.local with your network IP:
-   # NEXT_PUBLIC_WS_URL=wss://YOUR_IP:8080/ws
+   # For HTTP (local):
+   # NEXT_PUBLIC_WS_URL=ws://localhost:8080
+   # NEXT_PUBLIC_WS_URL_NETWORK=ws://YOUR_IP:8080
+   # NEXT_PUBLIC_API_URL=http://localhost:8080
+   # NEXT_PUBLIC_API_URL_NETWORK=http://YOUR_IP:8080
+   # For HTTPS (network):
+   # NEXT_PUBLIC_WS_URL=wss://YOUR_IP:8080
    # NEXT_PUBLIC_API_URL=https://YOUR_IP:8080
    ```
 

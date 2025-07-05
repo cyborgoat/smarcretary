@@ -35,11 +35,18 @@ echo "📝 Updating frontend configuration..."
 cd frontend
 
 # Update .env.local with the detected IP
+
+# For HTTPS, use wss:// instead of ws://
 cat > .env.local << EOF
-NEXT_PUBLIC_WEBSOCKET_URL=ws://localhost:8080
-NEXT_PUBLIC_WEBSOCKET_URL_NETWORK=ws://$LOCAL_IP:8080
+NEXT_PUBLIC_WS_URL=ws://localhost:8080
+NEXT_PUBLIC_WS_URL_NETWORK=ws://$LOCAL_IP:8080
 NEXT_PUBLIC_API_URL=http://localhost:8080
 NEXT_PUBLIC_API_URL_NETWORK=http://$LOCAL_IP:8080
+# For HTTPS, use:
+# NEXT_PUBLIC_WS_URL=wss://localhost:8080
+# NEXT_PUBLIC_WS_URL_NETWORK=wss://$LOCAL_IP:8080
+# NEXT_PUBLIC_API_URL=https://localhost:8080
+# NEXT_PUBLIC_API_URL_NETWORK=https://$LOCAL_IP:8080
 EOF
 
 cd ..
