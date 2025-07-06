@@ -13,7 +13,7 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://10.0.0.19:11434/api/generate")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:latest")
 
 # --- Whisper Model ---
-WHISPER_MODEL = whisper.load_model("base")
+WHISPER_MODEL = whisper.load_model("tiny")
 
 class TranscribeResponse(BaseModel):
     text: str
