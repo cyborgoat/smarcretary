@@ -19,6 +19,7 @@ import { useSocket } from "../hooks/useSocket"
 import { VideoThumbnail } from "@/components/ui/VideoThumbnail"
 import MeetingSidebar from "./MeetingSidebar"
 import ControlOverlay from "./ControlOverlay"
+import MeetingNotesDialog from "./MeetingNotesDialog"
 
 interface Message {
   id: string
@@ -476,48 +477,17 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
                 <Bot className="w-4 h-4 text-white drop-shadow" />
               </div>
             </div>
-            <span className="text-[9px] text-blue-500 mt-0.5 font-semibold tracking-tight drop-shadow-sm uppercase">AI</span>
             <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-stone-900 text-white text-xs rounded px-2 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Meeting Notes</span>
           </button>
         </div>
       {/* Meeting Notes Dialog */}
-      {notesOpen && (
-        <div className="fixed inset-0 z-50 flex items-stretch justify-stretch bg-black/70">
-          <div className="bg-white w-screen h-screen flex flex-col md:flex-row relative overflow-hidden">
-            <button
-              className="absolute top-4 right-8 text-stone-500 hover:text-stone-900 text-3xl font-bold z-10"
-              onClick={() => setNotesOpen(false)}
-              aria-label="Close notes dialog"
-              style={{ lineHeight: 1 }}
-            >×</button>
-            <div className="flex-1 flex flex-col p-6 min-w-0 min-h-0">
-              <h3 className="text-lg font-semibold mb-2">Your Notes</h3>
-              <textarea
-                className="w-full h-full border border-stone-200 rounded-lg p-2 text-sm flex-1 resize-none min-h-0 min-w-0"
-                placeholder="Type your meeting notes here..."
-                value={userNotes}
-                onChange={e => setUserNotes(e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <div className="flex justify-end mt-2">
-                <button
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm"
-                  onClick={() => setNotesOpen(false)}
-                >Save</button>
-              </div>
-            </div>
-            <div className="flex-1 flex flex-col border-t md:border-t-0 md:border-l border-stone-200 p-6 min-w-0 min-h-0">
-              <h3 className="text-lg font-semibold mb-2">Voice Transcription</h3>
-              <textarea
-                className="w-full h-full border border-stone-200 rounded-lg p-2 text-sm flex-1 bg-stone-50 resize-none min-h-0 min-w-0"
-                value={meetingNotes.join('\n')}
-                readOnly
-                style={{ flex: 1 }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <MeetingNotesDialog
+        notesOpen={notesOpen}
+        userNotes={userNotes}
+        setUserNotes={setUserNotes}
+        setNotesOpen={setNotesOpen}
+        meetingNotes={meetingNotes}
+      />
         {/* Right: Actions */}
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 px-2 py-1 rounded-lg" onClick={copyRoomId}>
@@ -703,6 +673,15 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
           hostName={hostName}
         />
       </div>
+
+      {/* Meeting Notes Dialog */}
+      <MeetingNotesDialog
+        notesOpen={notesOpen}
+        userNotes={userNotes}
+        setUserNotes={setUserNotes}
+        setNotesOpen={setNotesOpen}
+        meetingNotes={meetingNotes}
+      />
     </div>
   )
 }
