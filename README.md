@@ -1,3 +1,4 @@
+
 # Smart Secretary - WebRTC Video Conferencing
 
 A modern, real-time video conferencing application built with Next.js (frontend) and FastAPI (backend), featuring:
@@ -6,6 +7,8 @@ A modern, real-time video conferencing application built with Next.js (frontend)
 - WebSocket signaling
 - Secure HTTPS/WSS for network access
 - Modern UI with shadcn/ui components
+- **AI-powered live voice transcription and meeting notes**
+- Full-featured meeting notes dialog (click the AI icon in the header)
 
 ---
 
@@ -78,11 +81,16 @@ caddy run
 
 ---
 
+
 ## 🛠️ Development & Troubleshooting
 
 - All configuration is handled by `setup-network.sh`.
 - For camera/mic on remote devices, always use HTTPS/WSS and accept the cert in your browser.
 - If you see WebSocket or certificate errors, ensure your cert was generated with the correct IP and is trusted in your OS/browser.
+- **Meeting Notes & Voice Transcription:**
+  - Click the AI icon in the meeting header to open the fullscreen notes dialog.
+  - The left panel is for your editable notes; the right panel shows live voice transcription.
+  - Voice captions are automatically appended to the right panel during meetings.
 - See backend and frontend README files for more details.
 
 ---

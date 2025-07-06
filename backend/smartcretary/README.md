@@ -3,6 +3,7 @@
 This is the backend for the Smart Secretary WebRTC Video Conferencing application.
 It is built with FastAPI and provides WebSocket signaling and REST APIs for real-time video meetings.
 
+
 ## Features
 
 - WebSocket signaling for WebRTC peer-to-peer connections
@@ -10,6 +11,7 @@ It is built with FastAPI and provides WebSocket signaling and REST APIs for real
 - REST API for room listing and health checks
 - CORS support for local and network access
 - HTTPS support with self-signed certificates for secure camera/mic access
+- **/voice/transcribe endpoint for AI-powered live voice transcription**
 
 ## Requirements
 
@@ -43,6 +45,7 @@ It is built with FastAPI and provides WebSocket signaling and REST APIs for real
 
    The server will be available at `https://YOUR_IP:8080`.
 
+
 ## Endpoints
 
 - `GET /` — Welcome message
@@ -50,15 +53,18 @@ It is built with FastAPI and provides WebSocket signaling and REST APIs for real
 - `GET /rooms` — List active rooms
 - `GET /rooms/{room_id}` — Get room details
 - `WS /ws/{room_id}/{user_name}` — WebSocket signaling endpoint
+- `POST /voice/transcribe` — Upload audio and receive live transcription (used for meeting captions)
 
 ## Network Access
 
 - Accept the self-signed certificate in your browser for HTTPS/WSS to work.
 - Ensure ports 8080 (backend) and 3000 (frontend) are open on your firewall.
 
+
 ## Development
 
 - Main code: `main.py`
+- Voice transcription: `voice/api_transcriber.py`
 - For troubleshooting, see the main project README.
 
 ## License

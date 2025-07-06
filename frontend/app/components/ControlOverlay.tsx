@@ -3,7 +3,6 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Mic, MicOff, Video, VideoOff, Phone, MoreVertical, ChevronDown, ChevronUp } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "./ui/shadcn-dialog"
 
 export interface ControlOverlayProps {
   isMuted: boolean;

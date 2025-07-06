@@ -1,6 +1,10 @@
+
 # Smart Secretary Frontend
 
 This is the Next.js frontend for the Smart Secretary WebRTC Video Conferencing app.
+Now includes:
+- Full-featured meeting notes dialog (AI icon in header)
+- Live voice transcription/captions (right panel in notes dialog)
 
 ## Getting Started
 
@@ -29,8 +33,10 @@ This is the Next.js frontend for the Smart Secretary WebRTC Video Conferencing a
    - Local: https://localhost:3000
    - Network: https://YOUR_IP:3000 (accept certificate warning)
 
+
 ## Development
 - Main UI: `app/components/meeting-room.tsx`
+- Meeting notes dialog: click the AI icon in the meeting header
 - WebRTC logic: `app/hooks/useWebRTC.ts`
 - WebSocket logic: `app/hooks/useSocket.ts`
 
