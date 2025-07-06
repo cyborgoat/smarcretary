@@ -10,6 +10,7 @@ import {
   Settings,
   Share,
   AlertTriangle,
+  Bot,
 } from "lucide-react"
 import { useWebRTC } from "../hooks/useWebRTC"
 import { useSocket } from "../hooks/useSocket"
@@ -376,20 +377,16 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-stone-100 to-stone-200">
       {/* Header */}
-      <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm border-b border-stone-200/50 p-2 flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center space-x-3">
-          <h1 className="text-stone-900 text-lg font-medium">Room: {roomId}</h1>
-          <Badge variant="secondary" className={`text-white text-xs ${isConnected ? 'bg-emerald-600' : 'bg-amber-600'}`}> 
-            {isConnected ? "Connected" : "Connecting..."}
-          </Badge>
+      <div className="flex-shrink-0 bg-white/95 backdrop-blur-lg border-b border-stone-200/60 px-2 py-1 flex items-center justify-between shadow z-20 relative h-14">
+        {/* Left: Room info, status, and network */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-bold text-stone-700 tracking-widest uppercase bg-stone-100 rounded px-2 py-0.5 shadow-sm border border-stone-200/70">{roomId}</span>
+          <Badge variant="secondary" className={`text-white text-[10px] px-2 py-0.5 rounded-full shadow ${isConnected ? 'bg-emerald-600' : 'bg-amber-600'}`}>{isConnected ? "Connected" : "Connecting..."}</Badge>
           {isConnecting && (
-            <Badge variant="secondary" className="bg-amber-600 text-white text-xs">
-              Initializing...
-            </Badge>
+            <Badge variant="secondary" className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow">Init</Badge>
           )}
-          {/* Small network info dot/button */}
           <button
-            className={`ml-1 w-2 h-2 rounded-full border ${isConnected ? 'bg-emerald-500 border-emerald-700' : 'bg-amber-500 border-amber-700'} flex items-center justify-center relative`}
+            className={`ml-1 w-2.5 h-2.5 rounded-full border border-stone-300 ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'} flex items-center justify-center relative transition-colors`}
             title="Network info"
             onClick={() => setShowNetworkInfo((v) => !v)}
             aria-label="Show network info"
@@ -397,24 +394,34 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
             <span className="sr-only">Network info</span>
           </button>
           {showNetworkInfo && (
-            <div className="absolute top-12 left-0 bg-stone-800 border border-stone-700 rounded-lg px-4 py-2 text-stone-200 text-xs z-50 shadow-lg min-w-[220px]">
-              <strong>Network Access:</strong> Other devices can join at
+            <div className="absolute top-12 left-0 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-stone-200 text-xs z-50 shadow-lg min-w-[180px]">
+              <strong>Network:</strong> <br />
+              <code className="bg-stone-900 px-1 rounded text-xs">{window.location.origin.replace('localhost', '10.0.0.37')}?room={roomId}&name=YourName</code>
               <br />
-              <code className="bg-stone-900 px-1 rounded">
-                {window.location.origin.replace('localhost', '10.0.0.37')}?room={roomId}&name=YourName
-              </code>
-              <br />
-              <small>Camera/microphone requires HTTPS for remote devices</small>
+              <small>HTTPS required for camera/mic</small>
             </div>
           )}
         </div>
-        <div className="flex items-center space-x-1">
-          <Button variant="ghost" size="sm" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 text-xs p-2" onClick={copyRoomId}>
-            <Share className="h-3 w-3 mr-1" />
-            Share
+        {/* Center: AI Assistant Icon - lucide-react icon, minimal, glassy, with label below */}
+        <div className="flex-1 flex flex-col items-center justify-center pointer-events-none select-none relative">
+          <div className="relative flex flex-col items-center">
+            <div className="relative flex items-center justify-center">
+              <div className="rounded-full bg-gradient-to-br from-emerald-400/90 to-blue-500/90 shadow-lg border border-white/80 p-1 flex items-center justify-center" style={{ width: 22, height: 22 }}>
+                {/* Lucide Bot icon (or any other lucide icon you prefer) */}
+                {/* import { Bot } from 'lucide-react' at the top if not already */}
+                <Bot className="w-4 h-4 text-white drop-shadow" />
+              </div>
+            </div>
+            <span className="text-[9px] text-blue-500 mt-0.5 font-semibold tracking-tight drop-shadow-sm uppercase">AI</span>
+          </div>
+        </div>
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 px-2 py-1 rounded-lg" onClick={copyRoomId}>
+            <Share className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 p-2">
-            <Settings className="h-3 w-3" />
+          <Button variant="ghost" size="icon" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 px-2 py-1 rounded-lg">
+            <Settings className="h-4 w-4" />
           </Button>
         </div>
       </div>
