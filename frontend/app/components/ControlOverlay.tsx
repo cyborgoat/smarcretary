@@ -13,13 +13,14 @@ export interface ControlOverlayProps {
   onLeave: () => void;
   localStream: MediaStream | null;
   isMobile: boolean;
+  meetingNotes: string[];
+  setMeetingNotes: (notes: string[]) => void;
 }
 
-export default function ControlOverlay({ isMuted, isVideoOn, onMute, onVideo, onLeave, localStream, isMobile }: ControlOverlayProps) {
+export default function ControlOverlay({ isMuted, isVideoOn, onMute, onVideo, onLeave, localStream, isMobile, meetingNotes, setMeetingNotes }: ControlOverlayProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const [notesOpen, setNotesOpen] = useState(false)
+  // Notes dialog state is now managed in MeetingRoom
   const [menuOpen, setMenuOpen] = useState(false)
-  const [meetingNotes, setMeetingNotes] = useState("")
   const handleLeave = () => {
     onLeave()
     window.location.href = "/"
@@ -96,10 +97,6 @@ export default function ControlOverlay({ isMuted, isVideoOn, onMute, onVideo, on
               >Leave meeting</button>
               <button
                 className="w-full text-left px-4 py-2 text-sm hover:bg-stone-100"
-                onClick={() => { setMenuOpen(false); setNotesOpen(true); }}
-              >Open notes</button>
-              <button
-                className="w-full text-left px-4 py-2 text-sm hover:bg-stone-100"
                 onClick={() => { setMenuOpen(false); }}
               >Settings</button>
               <button
@@ -109,29 +106,6 @@ export default function ControlOverlay({ isMuted, isVideoOn, onMute, onVideo, on
             </div>
           )}
         </div>
-        {/* Notes dialog */}
-        <Dialog open={notesOpen} onOpenChange={setNotesOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Meeting Notes</DialogTitle>
-              <DialogDescription>
-                Take notes for this meeting. In the future, AI will help summarize and generate tasks from your notes and chat history.
-              </DialogDescription>
-            </DialogHeader>
-            <textarea
-              className="w-full min-h-[120px] border border-stone-200 rounded-lg p-2 mt-2 text-sm"
-              placeholder="Type your meeting notes here..."
-              value={meetingNotes}
-              onChange={e => setMeetingNotes(e.target.value)}
-              autoFocus
-            />
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="secondary">Close</Button>
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </motion.div>
     </motion.div>
   )

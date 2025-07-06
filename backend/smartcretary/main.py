@@ -37,9 +37,10 @@ app.include_router(signaling_router)
 # from smartcretary.vision.object_detection import router as vision_router
 # app.include_router(vision_router)
 
-# --- Voice/Transcription AI Endpoints (future) ---
-# from smartcretary.voice.transcriber import router as voice_router
-# app.include_router(voice_router)
+
+# --- Voice/Transcription AI Endpoints ---
+from smartcretary.voice.api_transcriber import router as voice_router
+app.include_router(voice_router, prefix="/voice")
 
 @app.get("/")
 async def root():

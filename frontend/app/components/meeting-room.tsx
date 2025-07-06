@@ -1,6 +1,8 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from "react"
+// @ts-ignore
+import Recorder from "recorder-js";
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -33,28 +35,47 @@ interface MeetingRoomProps {
   onLeave: () => void
 }
 
+
 export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomProps) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [newMessage, setNewMessage] = useState("")
-  const [activeTab, setActiveTab] = useState("chat")
-  const [permissionError, setPermissionError] = useState<string | null>(null)
-  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null)
-  const [participantVolumes, setParticipantVolumes] = useState<{ [id: string]: number }>({})
-  const [mutedParticipants] = useState<{ [id: string]: boolean }>({})
-  const [showNetworkInfo, setShowNetworkInfo] = useState(false)
-  const [isMainVideoLocal, setIsMainVideoLocal] = useState(true)
-  const [pipPosition, setPipPosition] = useState({ x: 20, y: 20 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  // --- Notes Dialog State ---
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [userNotes, setUserNotes] = useState<string>("");
+  // --- All State Declarations at Top ---
+  const [caption, setCaption] = useState("");
+  const [captionsEnabled] = useState(true); // always on by default
+  const [meetingNotes, setMeetingNotes] = useState<string[]>([]); // store all chat messages
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [activeTab, setActiveTab] = useState("chat");
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
+  const [participantVolumes, setParticipantVolumes] = useState<{ [id: string]: number }>({});
+  const [mutedParticipants] = useState<{ [id: string]: boolean }>({});
+  const [showNetworkInfo, setShowNetworkInfo] = useState(false);
+  const [isMainVideoLocal, setIsMainVideoLocal] = useState(true);
+  const [pipPosition, setPipPosition] = useState({ x: 20, y: 20 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
-  const localVideoRef = useRef<HTMLVideoElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const sendJsonMessageRef = useRef<((message: object) => void) | null>(null)
-  const pipRef = useRef<HTMLDivElement>(null)
-  const dragStartPos = useRef({ x: 0, y: 0 })
-  const dragStartPipPos = useRef({ x: 0, y: 0 })
+  // --- All Refs ---
+  const audioRecorderRef = useRef<any>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const captionIntervalRef = useRef<any>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sendJsonMessageRef = useRef<((message: object) => void) | null>(null);
+  const pipRef = useRef<HTMLDivElement>(null);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const dragStartPipPos = useRef({ x: 0, y: 0 });
+
+  // --- Meeting Notes: store all chat messages ---
+  useEffect(() => {
+    if (messages.length > 0) {
+      setMeetingNotes((prev) => [...prev, messages[messages.length - 1].content]);
+    }
+  }, [messages]);
 
   // Stable callback to send signaling messages via the WebSocket
   const sendSignalingMessage = useCallback((message: object) => {
@@ -357,16 +378,56 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
   );
 });
 
+
   // --- Refactored main video and PiP logic ---
   // Helper to get main and PiP participant info
   const allParticipants = [
     { id: "local", name: userName, isMuted, isVideoOn, stream: localStream, isLocal: true },
     ...participants.map(p => ({ ...p, isLocal: false }))
-  ]
-  const mainIdx = isMainVideoLocal ? 0 : allParticipants.findIndex(p => p.id === selectedParticipantId)
-  const pipIdx = isMainVideoLocal ? allParticipants.findIndex(p => p.id === selectedParticipantId) : 0
-  const mainParticipant = allParticipants[mainIdx]
-  const pipParticipant = allParticipants[pipIdx]
+  ];
+  const mainIdx = isMainVideoLocal ? 0 : allParticipants.findIndex(p => p.id === selectedParticipantId);
+  const pipIdx = isMainVideoLocal ? allParticipants.findIndex(p => p.id === selectedParticipantId) : 0;
+  const mainParticipant = allParticipants[mainIdx];
+  const pipParticipant = allParticipants[pipIdx];
+
+  // --- Caption: record and send audio for main speaker only ---
+  useEffect(() => {
+    if (!captionsEnabled || !mainParticipant || !mainParticipant.isLocal || !mainParticipant.stream) return;
+    // Only record if local user is main video
+    let stopped = false;
+    const startRecording = async () => {
+      if (!audioRecorderRef.current) {
+        const RecorderJS = (await import("recorder-js")).default;
+        audioRecorderRef.current = new RecorderJS(window.AudioContext ? new window.AudioContext() : (window as any).webkitAudioContext && new (window as any).webkitAudioContext());
+      }
+      if (!audioStreamRef.current) {
+        audioStreamRef.current = mainParticipant.stream;
+      }
+      await audioRecorderRef.current.init(audioStreamRef.current);
+      const recordAndSend = async () => {
+        if (stopped) return;
+        await audioRecorderRef.current.start();
+        setTimeout(async () => {
+          const { blob } = await audioRecorderRef.current.stop();
+          // Send to backend for transcription
+          const formData = new FormData();
+          formData.append("file", blob, "audio.wav");
+          try {
+          const resp = await fetch("https://10.0.0.37:8080/voice/transcribe", { method: "POST", body: formData });
+            const data = await resp.json();
+            if (data.text) {
+              setCaption(data.text);
+              setMeetingNotes(prev => prev[prev.length - 1] === data.text ? prev : [...prev, data.text]);
+            }
+          } catch (e) { setCaption(""); }
+          if (!stopped) recordAndSend();
+        }, 3000); // every 3s
+      };
+      recordAndSend();
+    };
+    startRecording();
+    return () => { stopped = true; audioRecorderRef.current && audioRecorderRef.current.stop(); };
+  }, [captionsEnabled, mainParticipant && mainParticipant.isLocal, mainParticipant && mainParticipant.stream]);
 
   // --- Host logic ---
   // The host is the user with the lexicographically smallest name (or id) in the room
@@ -403,18 +464,60 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
           )}
         </div>
         {/* Center: AI Assistant Icon - lucide-react icon, minimal, glassy, with label below */}
-        <div className="flex-1 flex flex-col items-center justify-center pointer-events-none select-none relative">
-          <div className="relative flex flex-col items-center">
+        <div className="flex-1 flex flex-col items-center justify-center select-none relative">
+          <button
+            className="relative flex flex-col items-center group focus:outline-none"
+            onClick={() => setNotesOpen(true)}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+            aria-label="Open meeting notes dialog"
+          >
             <div className="relative flex items-center justify-center">
               <div className="rounded-full bg-gradient-to-br from-emerald-400/90 to-blue-500/90 shadow-lg border border-white/80 p-1 flex items-center justify-center" style={{ width: 22, height: 22 }}>
-                {/* Lucide Bot icon (or any other lucide icon you prefer) */}
-                {/* import { Bot } from 'lucide-react' at the top if not already */}
                 <Bot className="w-4 h-4 text-white drop-shadow" />
               </div>
             </div>
             <span className="text-[9px] text-blue-500 mt-0.5 font-semibold tracking-tight drop-shadow-sm uppercase">AI</span>
+            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-stone-900 text-white text-xs rounded px-2 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Meeting Notes</span>
+          </button>
+        </div>
+      {/* Meeting Notes Dialog */}
+      {notesOpen && (
+        <div className="fixed inset-0 z-50 flex items-stretch justify-stretch bg-black/70">
+          <div className="bg-white w-screen h-screen flex flex-col md:flex-row relative overflow-hidden">
+            <button
+              className="absolute top-4 right-8 text-stone-500 hover:text-stone-900 text-3xl font-bold z-10"
+              onClick={() => setNotesOpen(false)}
+              aria-label="Close notes dialog"
+              style={{ lineHeight: 1 }}
+            >×</button>
+            <div className="flex-1 flex flex-col p-6 min-w-0 min-h-0">
+              <h3 className="text-lg font-semibold mb-2">Your Notes</h3>
+              <textarea
+                className="w-full h-full border border-stone-200 rounded-lg p-2 text-sm flex-1 resize-none min-h-0 min-w-0"
+                placeholder="Type your meeting notes here..."
+                value={userNotes}
+                onChange={e => setUserNotes(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <div className="flex justify-end mt-2">
+                <button
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm"
+                  onClick={() => setNotesOpen(false)}
+                >Save</button>
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col border-t md:border-t-0 md:border-l border-stone-200 p-6 min-w-0 min-h-0">
+              <h3 className="text-lg font-semibold mb-2">Voice Transcription</h3>
+              <textarea
+                className="w-full h-full border border-stone-200 rounded-lg p-2 text-sm flex-1 bg-stone-50 resize-none min-h-0 min-w-0"
+                value={meetingNotes.join('\n')}
+                readOnly
+                style={{ flex: 1 }}
+              />
+            </div>
           </div>
         </div>
+      )}
         {/* Right: Actions */}
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 px-2 py-1 rounded-lg" onClick={copyRoomId}>
@@ -475,8 +578,8 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
                     width: '100%',
                     height: '100%',
                     aspectRatio: '16/9',
-                    maxWidth: isMobile ? '100%' : 'calc(100vw - 400px)', // Account for sidebar width
-                    maxHeight: isMobile ? 'calc(100vh - 200px)' : 'calc(100vh - 150px)', // Account for header and controls
+                    maxWidth: isMobile ? '100%' : 'calc(100vw - 400px)',
+                    maxHeight: isMobile ? 'calc(100vh - 200px)' : 'calc(100vh - 150px)',
                   }}
                 >
                   <VideoTile
@@ -491,6 +594,12 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
                     showVolume={!mainParticipant.isLocal}
                     className="w-full h-full"
                   />
+                  {/* Caption overlay for main screen's speaker */}
+                  {captionsEnabled && caption && mainParticipant.isLocal && (
+                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/80 text-white text-lg px-4 py-2 rounded-xl shadow-lg max-w-[80%] text-center z-30">
+                      {caption}
+                    </div>
+                  )}
                 </div>
               ), [
                 mainParticipant.stream,
@@ -500,7 +609,9 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
                 mainParticipant.isLocal,
                 participantVolumes[mainParticipant.id],
                 mutedParticipants[mainParticipant.id],
-                isMobile
+                isMobile,
+                captionsEnabled,
+                caption
               ])}
               {/* PiP/Thumbnail: show only one mini video, same logic for mobile and desktop */}
               {(pipParticipant && pipIdx !== -1 && pipIdx !== mainIdx) && (
@@ -563,6 +674,8 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
                 onLeave={handleLeave}
                 localStream={localStream}
                 isMobile={isMobile}
+                meetingNotes={meetingNotes}
+                setMeetingNotes={setMeetingNotes}
               />
             </div>
           </div>
