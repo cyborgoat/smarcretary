@@ -39,17 +39,10 @@ export function useSocket(
   const ws = useRef<WebSocket | null>(null)
 
   useEffect(() => {
-    // Try to detect if we're on the local network
-    const isLocalNetwork = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-    
-    let wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8080"
-    if (isLocalNetwork && process.env.NEXT_PUBLIC_WEBSOCKET_URL_NETWORK) {
-      wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL_NETWORK
-    }
-    
+    // Use only NEXT_PUBLIC_WS_URL for WebSocket endpoint, as per unified .env
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080"
     const wsEndpoint = `${wsUrl}/ws/${roomId}/${encodeURIComponent(userName)}`
     console.log("Connecting to WebSocket:", wsEndpoint)
-    
     ws.current = new WebSocket(wsEndpoint)
 
     ws.current.onopen = () => {

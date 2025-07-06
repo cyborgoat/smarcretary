@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useRef, useEffect, useCallback } from "react"
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +20,7 @@ import { useWebRTC } from "../hooks/useWebRTC"
 import { useSocket } from "../hooks/useSocket"
 import { VideoThumbnail } from "@/components/ui/VideoThumbnail"
 import MeetingSidebar from "./MeetingSidebar"
+import ControlOverlay from "./ControlOverlay"
 
 interface Message {
   id: string
@@ -260,103 +259,107 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
 
   useEffect(() => { setHydrated(true); }, []);
 
-  // --- VideoTile: Generic video/participant tile for local or remote ---
-  function VideoTile({
-    stream,
-    name,
-    isMuted,
-    isVideoOn,
-    isLocal,
-    volume = 1,
-    muted = false,
-    onVolumeChange,
-    className = "",
-    style = {},
-    showVolume = false,
-  }: {
-    stream?: MediaStream
-    name: string
-    isMuted: boolean
-    isVideoOn: boolean
-    isLocal?: boolean
-    volume?: number
-    muted?: boolean
-    onVolumeChange?: (v: number) => void
-    className?: string
-    style?: React.CSSProperties
-    showVolume?: boolean
-  }) {
-    const videoRef = useRef<HTMLVideoElement>(null)
-    const audioRef = useRef<HTMLAudioElement>(null)
+// --- VideoTile: Generic video/participant tile for local or remote ---
 
-    useEffect(() => {
-      if (stream && videoRef.current) {
-        videoRef.current.srcObject = stream
-      }
-      if (stream && audioRef.current && !isLocal) {
-        audioRef.current.srcObject = stream
-        audioRef.current.volume = volume ?? 1
-        audioRef.current.muted = muted ?? false
-      }
-    }, [stream, volume, muted, isLocal])
 
-    return (
-      <div className={`relative w-full h-full flex items-center justify-center ${className}`} style={style}>
-        {stream && isVideoOn ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted={isLocal}
-            className="w-full h-full object-cover rounded-lg"
-            style={isLocal ? { transform: "scaleX(-1)" } : {}}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg">
-            <Avatar className="h-24 w-24 mx-auto mb-4">
-              <AvatarFallback className="text-2xl bg-gray-600">
-                {name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="absolute bottom-2 left-2 right-2 text-center text-white">
-              <h3 className="text-xl font-semibold">{name}</h3>
-              <p className="text-gray-300">Camera is off</p>
-            </div>
+interface VideoTileProps {
+  stream?: MediaStream;
+  name: string;
+  isMuted: boolean;
+  isVideoOn: boolean;
+  isLocal?: boolean;
+  volume?: number;
+  muted?: boolean;
+  onVolumeChange?: (v: number) => void;
+  className?: string;
+  style?: React.CSSProperties;
+  showVolume?: boolean;
+}
+
+const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
+  stream,
+  name,
+  isMuted,
+  isVideoOn,
+  isLocal,
+  volume = 1,
+  muted = false,
+  onVolumeChange,
+  className = "",
+  style = {},
+  showVolume = false,
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+    if (stream && audioRef.current && !isLocal) {
+      audioRef.current.srcObject = stream;
+      audioRef.current.volume = volume ?? 1;
+      audioRef.current.muted = muted ?? false;
+    }
+  }, [stream, volume, muted, isLocal]);
+
+  return (
+    <div className={`relative w-full h-full flex items-center justify-center ${className}`} style={style}>
+      {stream && isVideoOn ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={isLocal}
+          className="w-full h-full object-cover rounded-lg"
+          style={isLocal ? { transform: "scaleX(-1)" } : {}}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg">
+          <Avatar className="h-24 w-24 mx-auto mb-4">
+            <AvatarFallback className="text-2xl bg-gray-600">
+              {name.split(" ").map((n) => n[0]).join("").toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="absolute bottom-2 left-2 right-2 text-center text-white">
+            <h3 className="text-xl font-semibold">{name}</h3>
+            <p className="text-gray-300">Camera is off</p>
           </div>
-        )}
-        {/* Audio for remote participant */}
-        {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
-        {/* Mute indicator */}
-        {isMuted && (
-          <div className="absolute top-2 right-2 bg-red-500 rounded-full p-1 z-20">
-            <MicOff className="h-4 w-4 text-white" />
-          </div>
-        )}
-        {/* Volume control overlay */}
-        {showVolume && onVolumeChange && !isLocal && (
-          <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 rounded-lg px-3 py-2 opacity-0 hover:opacity-100 transition-opacity">
-            <div className="flex items-center">
-              <label htmlFor="main-volume" className="text-xs text-white mr-2">Volume</label>
-              <input
-                id="main-volume"
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={volume}
-                onChange={e => onVolumeChange(Number(e.target.value))}
-                className="w-16"
-              />
-            </div>
-          </div>
-        )}
-        {/* Name overlay for PiP/thumbnail */}
-        <div className="absolute bottom-1 left-1 right-1 bg-black bg-opacity-50 rounded px-1 py-0.5">
-          <p className="text-white text-xs truncate">{name}{isLocal ? " (You)" : ""}</p>
         </div>
+      )}
+      {/* Audio for remote participant */}
+      {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
+      {/* Mute indicator */}
+      {isMuted && (
+        <div className="absolute top-2 right-2 bg-red-500 rounded-full p-1 z-20">
+          <MicOff className="h-4 w-4 text-white" />
+        </div>
+      )}
+      {/* Volume control overlay */}
+      {showVolume && onVolumeChange && !isLocal && (
+        <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 rounded-lg px-3 py-2 opacity-0 hover:opacity-100 transition-opacity">
+          <div className="flex items-center">
+            <label htmlFor="main-volume" className="text-xs text-white mr-2">Volume</label>
+            <input
+              id="main-volume"
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={volume}
+              onChange={e => onVolumeChange(Number(e.target.value))}
+              className="w-16"
+            />
+          </div>
+        </div>
+      )}
+      {/* Name overlay for PiP/thumbnail */}
+      <div className="absolute bottom-1 left-1 right-1 bg-black bg-opacity-50 rounded px-1 py-0.5">
+        <p className="text-white text-xs truncate">{name}{isLocal ? " (You)" : ""}</p>
       </div>
-    )
-  }
+    </div>
+  );
+});
 
   // --- Refactored main video and PiP logic ---
   // Helper to get main and PiP participant info
@@ -378,20 +381,20 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-stone-100 to-stone-200">
       {/* Header */}
-      <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm border-b border-stone-200/50 p-4 flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-stone-900 text-xl font-medium">Room: {roomId}</h1>
-          <Badge variant="secondary" className={`text-white ${isConnected ? 'bg-emerald-600' : 'bg-amber-600'}`}> 
+      <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm border-b border-stone-200/50 p-2 flex items-center justify-between shadow-sm z-10">
+        <div className="flex items-center space-x-3">
+          <h1 className="text-stone-900 text-lg font-medium">Room: {roomId}</h1>
+          <Badge variant="secondary" className={`text-white text-xs ${isConnected ? 'bg-emerald-600' : 'bg-amber-600'}`}> 
             {isConnected ? "Connected" : "Connecting..."}
           </Badge>
           {isConnecting && (
-            <Badge variant="secondary" className="bg-amber-600 text-white">
+            <Badge variant="secondary" className="bg-amber-600 text-white text-xs">
               Initializing...
             </Badge>
           )}
           {/* Small network info dot/button */}
           <button
-            className={`ml-2 w-3 h-3 rounded-full border-2 ${isConnected ? 'bg-emerald-500 border-emerald-700' : 'bg-amber-500 border-amber-700'} flex items-center justify-center relative`}
+            className={`ml-1 w-2 h-2 rounded-full border ${isConnected ? 'bg-emerald-500 border-emerald-700' : 'bg-amber-500 border-amber-700'} flex items-center justify-center relative`}
             title="Network info"
             onClick={() => setShowNetworkInfo((v) => !v)}
             aria-label="Show network info"
@@ -410,13 +413,13 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
             </div>
           )}
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="sm" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100" onClick={copyRoomId}>
-            <Share className="h-4 w-4 mr-2" />
-            Share Room
+        <div className="flex items-center space-x-1">
+          <Button variant="ghost" size="sm" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 text-xs p-2" onClick={copyRoomId}>
+            <Share className="h-3 w-3 mr-1" />
+            Share
           </Button>
-          <Button variant="ghost" size="sm" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100">
-            <Settings className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 p-2">
+            <Settings className="h-3 w-3" />
           </Button>
         </div>
       </div>
@@ -460,30 +463,55 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
         {/* Main Video Area */}
         <div className="flex-1 min-h-0 flex flex-col">
           {/* Video Grid */}
-          <div className="flex-1 min-h-0 p-4 relative">
-            <div className="h-full min-h-0 bg-white/60 backdrop-blur-sm rounded-2xl relative overflow-hidden flex items-center justify-center border border-stone-200/50 shadow-lg">
-              {/* Main Video (local or selected participant) - unified for mobile and desktop */}
-              <div className="w-full max-w-full h-full max-h-[70vh] aspect-[16/9] mx-auto flex items-center justify-center">
-                <VideoTile
-                  stream={mainParticipant.stream ?? undefined}
-                  name={mainParticipant.name}
-                  isMuted={mainParticipant.isMuted}
-                  isVideoOn={mainParticipant.isVideoOn}
-                  isLocal={mainParticipant.isLocal}
-                  volume={mainParticipant.isLocal ? 1 : participantVolumes[mainParticipant.id] ?? 1}
-                  muted={mainParticipant.isLocal ? true : mutedParticipants[mainParticipant.id]}
-                  onVolumeChange={mainParticipant.isLocal ? undefined : v => setParticipantVolumes(vols => ({ ...vols, [mainParticipant.id]: v }))}
-                  showVolume={!mainParticipant.isLocal}
-                  className="w-full h-full"
-                />
-              </div>
+          <div className="flex-1 min-h-0 p-2 relative">
+            <div className="h-full min-h-0 bg-white/60 backdrop-blur-sm rounded-xl relative overflow-hidden flex items-center justify-center border border-stone-200/50 shadow-lg">
+              {/* Main Video (local or selected participant) - dynamic responsive sizing */}
+              {useMemo(() => (
+                <div
+                  className="relative w-full h-full flex items-center justify-center bg-black rounded-lg overflow-hidden"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    aspectRatio: '16/9',
+                    maxWidth: isMobile ? '100%' : 'calc(100vw - 400px)', // Account for sidebar width
+                    maxHeight: isMobile ? 'calc(100vh - 200px)' : 'calc(100vh - 150px)', // Account for header and controls
+                  }}
+                >
+                  <VideoTile
+                    stream={mainParticipant.stream ?? undefined}
+                    name={mainParticipant.name}
+                    isMuted={mainParticipant.isMuted}
+                    isVideoOn={mainParticipant.isVideoOn}
+                    isLocal={mainParticipant.isLocal}
+                    volume={mainParticipant.isLocal ? 1 : participantVolumes[mainParticipant.id] ?? 1}
+                    muted={mainParticipant.isLocal ? true : mutedParticipants[mainParticipant.id]}
+                    onVolumeChange={mainParticipant.isLocal ? undefined : v => setParticipantVolumes(vols => ({ ...vols, [mainParticipant.id]: v }))}
+                    showVolume={!mainParticipant.isLocal}
+                    className="w-full h-full"
+                  />
+                </div>
+              ), [
+                mainParticipant.stream,
+                mainParticipant.name,
+                mainParticipant.isMuted,
+                mainParticipant.isVideoOn,
+                mainParticipant.isLocal,
+                participantVolumes[mainParticipant.id],
+                mutedParticipants[mainParticipant.id],
+                isMobile
+              ])}
               {/* PiP/Thumbnail: show only one mini video, same logic for mobile and desktop */}
               {(pipParticipant && pipIdx !== -1 && pipIdx !== mainIdx) && (
                 <div
-                  className={isMobile ? "absolute bottom-4 left-1/2 -translate-x-1/2 z-20" : "absolute cursor-move bg-white/90 backdrop-blur-sm rounded-xl border-2 border-stone-300 shadow-lg"}
-                  ref={isMobile ? undefined : pipRef}
-                  style={isMobile ? { width: 80, height: 60 } : { left: pipPosition.x, top: pipPosition.y, width: 200, height: 150, zIndex: 10 }}
-                  onMouseDown={isMobile ? undefined : handleMouseDown}
+                  className="absolute cursor-move bg-white/90 backdrop-blur-sm rounded-xl border-2 border-stone-300 shadow-lg z-20"
+                  ref={pipRef}
+                  style={{
+                    left: pipPosition.x,
+                    top: pipPosition.y,
+                    width: isMobile ? 100 : 200,
+                    height: isMobile ? 75 : 150,
+                  }}
+                  onMouseDown={handleMouseDown}
                   onClick={() => {
                     setIsMainVideoLocal(pipParticipant.isLocal)
                     if (!pipParticipant.isLocal) setSelectedParticipantId(pipParticipant.id)
@@ -496,14 +524,14 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
                     isVideoOn={pipParticipant.isVideoOn}
                     isLocal={pipParticipant.isLocal}
                     selected={false}
-                    style={isMobile ? { width: 80, height: 60 } : { width: 200, height: 150 }}
+                    style={{ width: isMobile ? 100 : 200, height: isMobile ? 75 : 150 }}
                   />
                 </div>
               )}
 
               {/* Meeting Info Overlay */}
-              <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-sm rounded-lg px-3 py-2 z-20">
-                <p className="text-white text-sm">
+              <div className="absolute top-2 left-2 bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 z-20">
+                <p className="text-white text-xs">
                   {participants.length + 1} participants • {currentTime}
                 </p>
               </div>
@@ -515,47 +543,25 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
               {!isMobile && selectedParticipantId && (
                 <button
                   onClick={swapVideos}
-                  className="absolute bottom-4 right-4 bg-stone-700 hover:bg-stone-800 rounded-full p-3 z-20 transition-colors"
+                  className="absolute bottom-2 right-2 bg-stone-700 hover:bg-stone-800 rounded-full p-2 z-20 transition-colors"
                   title="Swap main and picture-in-picture"
                 >
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                   </svg>
                 </button>
               )}
 
-              {/* Controls Overlay */}
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 mb-4 z-30">
-                <div className="flex items-center justify-center space-x-4 bg-white/80 backdrop-blur-md rounded-2xl px-6 py-3 shadow-lg border border-stone-200">
-                  <Button
-                    variant={isMuted ? "destructive" : "secondary"}
-                    size="lg"
-                    onClick={toggleMute}
-                    className="rounded-full h-12 w-12 bg-stone-100 hover:bg-stone-200 text-stone-700"
-                    disabled={!localStream}
-                  >
-                    {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                  </Button>
-
-                  <Button
-                    variant={isVideoOn ? "secondary" : "destructive"}
-                    size="lg"
-                    onClick={toggleVideo}
-                    className="rounded-full h-12 w-12 bg-stone-100 hover:bg-stone-200 text-stone-700"
-                    disabled={!localStream}
-                  >
-                    {isVideoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-                  </Button>
-
-                  <Button variant="destructive" size="lg" className="rounded-full h-12 w-12" onClick={handleLeave}>
-                    <Phone className="h-5 w-5" />
-                  </Button>
-
-                  <Button variant="ghost" size="lg" className="rounded-full h-12 w-12 text-stone-600 hover:text-stone-900 hover:bg-stone-100">
-                    <MoreVertical className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
+              {/* Controls Overlay - compact, collapsible, animated */}
+              <ControlOverlay
+                isMuted={isMuted}
+                isVideoOn={isVideoOn}
+                onMute={toggleMute}
+                onVideo={toggleVideo}
+                onLeave={handleLeave}
+                localStream={localStream}
+                isMobile={isMobile}
+              />
             </div>
           </div>
         </div>

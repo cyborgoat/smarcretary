@@ -30,11 +30,13 @@ sed -i.bak "s/10\.0\.0\.37/$LOCAL_IP/g" run.py
 
 cd ../../
 
-# Generate backend SSL certificate and key
-cd backend
-
 echo "🔐 Generating backend SSL certificate and key..."
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=$LOCAL_IP"
+# Generate backend SSL certificate and key with SAN for both IP and localhost
+cd backend
+echo "🔐 Generating backend SSL certificate and key (with SAN for IP and localhost)..."
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes \
+  -subj "/CN=$LOCAL_IP" \
+  -addext "subjectAltName=DNS:localhost,IP:$LOCAL_IP,IP:127.0.0.1"
 cd ..
 
 # Update frontend configuration
@@ -43,15 +45,15 @@ cd frontend
 
 # Update .env.local with the detected IP
 cat > .env.local << EOF
+# WebSocket backend URL (local dev)
 NEXT_PUBLIC_WS_URL=ws://localhost:8080
-NEXT_PUBLIC_WS_URL_NETWORK=ws://$LOCAL_IP:8080
+# For LAN/production, use your HTTPS/WSS endpoint:
+# NEXT_PUBLIC_WS_URL=wss://$LOCAL_IP:8080
+
+# API URL (local dev)
 NEXT_PUBLIC_API_URL=http://localhost:8080
-NEXT_PUBLIC_API_URL_NETWORK=http://$LOCAL_IP:8080
-# For HTTPS, use:
-# NEXT_PUBLIC_WS_URL=wss://localhost:8080
-# NEXT_PUBLIC_WS_URL_NETWORK=wss://$LOCAL_IP:8080
-# NEXT_PUBLIC_API_URL=https://localhost:8080
-# NEXT_PUBLIC_API_URL_NETWORK=https://$LOCAL_IP:8080
+# For LAN/production, use:
+# NEXT_PUBLIC_API_URL=https://$LOCAL_IP:8080
 EOF
 
 # Generate Caddyfile for HTTPS reverse proxy
