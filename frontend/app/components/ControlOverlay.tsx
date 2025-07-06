@@ -2,7 +2,8 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Mic, MicOff, Video, VideoOff, Phone, MoreVertical } from "lucide-react"
+import { Mic, MicOff, Video, VideoOff, Phone, MoreVertical, ChevronDown, ChevronUp } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "./ui/shadcn-dialog"
 
 export interface ControlOverlayProps {
   isMuted: boolean;
@@ -16,6 +17,13 @@ export interface ControlOverlayProps {
 
 export default function ControlOverlay({ isMuted, isVideoOn, onMute, onVideo, onLeave, localStream, isMobile }: ControlOverlayProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [meetingNotes, setMeetingNotes] = useState("")
+  const handleLeave = () => {
+    onLeave()
+    window.location.href = "/"
+  }
   return (
     <motion.div
       className="absolute bottom-0 left-1/2 -translate-x-1/2 mb-2 z-30"
@@ -50,42 +58,80 @@ export default function ControlOverlay({ isMuted, isVideoOn, onMute, onVideo, on
           variant="destructive"
           size="icon"
           className="rounded-full h-8 w-8"
-          onClick={onLeave}
+          onClick={handleLeave}
         >
           <Phone className="h-3 w-3" />
         </Button>
-        {!collapsed && (
+        {/* Collapse/Expand button with arrow icon */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-full h-8 w-8 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-label={collapsed ? "Expand controls" : "Collapse controls"}
+        >
+          <motion.div
+            animate={{ rotate: collapsed ? 180 : 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          >
+            {collapsed ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </motion.div>
+        </Button>
+        {/* More menu button */}
+        <div className="relative">
           <Button
             variant="ghost"
             size="icon"
             className="rounded-full h-8 w-8 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
-            onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? "Expand controls" : "Collapse controls"}
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="More options"
           >
-            <motion.div
-              animate={{ rotate: collapsed ? 90 : 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            >
-              <MoreVertical className="h-3 w-3" />
-            </motion.div>
+            <MoreVertical className="h-3 w-3" />
           </Button>
-        )}
-        {collapsed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full h-8 w-8 text-stone-600 hover:text-stone-900 hover:bg-stone-100"
-            onClick={() => setCollapsed((v) => !v)}
-            aria-label="Expand controls"
-          >
-            <motion.div
-              animate={{ rotate: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            >
-              <MoreVertical className="h-3 w-3" />
-            </motion.div>
-          </Button>
-        )}
+          {menuOpen && (
+            <div className="absolute right-0 bottom-12 z-50 min-w-[180px] bg-white border border-stone-200 rounded-lg shadow-lg py-1">
+              <button
+                className="w-full text-left px-4 py-2 text-sm hover:bg-stone-100"
+                onClick={() => { setMenuOpen(false); handleLeave(); }}
+              >Leave meeting</button>
+              <button
+                className="w-full text-left px-4 py-2 text-sm hover:bg-stone-100"
+                onClick={() => { setMenuOpen(false); setNotesOpen(true); }}
+              >Open notes</button>
+              <button
+                className="w-full text-left px-4 py-2 text-sm hover:bg-stone-100"
+                onClick={() => { setMenuOpen(false); }}
+              >Settings</button>
+              <button
+                className="w-full text-left px-4 py-2 text-sm hover:bg-stone-100"
+                onClick={() => { setMenuOpen(false); }}
+              >Toggle caption</button>
+            </div>
+          )}
+        </div>
+        {/* Notes dialog */}
+        <Dialog open={notesOpen} onOpenChange={setNotesOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Meeting Notes</DialogTitle>
+              <DialogDescription>
+                Take notes for this meeting. In the future, AI will help summarize and generate tasks from your notes and chat history.
+              </DialogDescription>
+            </DialogHeader>
+            <textarea
+              className="w-full min-h-[120px] border border-stone-200 rounded-lg p-2 mt-2 text-sm"
+              placeholder="Type your meeting notes here..."
+              value={meetingNotes}
+              onChange={e => setMeetingNotes(e.target.value)}
+              autoFocus
+            />
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="secondary">Close</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </motion.div>
     </motion.div>
   )
