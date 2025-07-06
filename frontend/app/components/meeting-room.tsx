@@ -6,13 +6,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
-  Mic,
   MicOff,
-  Video,
-  VideoOff,
-  Phone,
   Settings,
-  MoreVertical,
   Share,
   AlertTriangle,
 } from "lucide-react"
