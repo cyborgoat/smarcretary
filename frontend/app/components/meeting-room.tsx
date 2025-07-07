@@ -345,6 +345,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
         showNetworkInfo={showNetworkInfo}
         setShowNetworkInfo={setShowNetworkInfo}
         copyRoomId={copyRoomId}
+        setNotesOpen={setNotesOpen}
       />
 
       {/* Error Alerts */}

@@ -1,7 +1,7 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Share, Settings } from "lucide-react";
+import { Share, Settings, Bot } from "lucide-react";
 
 interface MeetingHeaderProps {
   roomId: string;
@@ -10,6 +10,7 @@ interface MeetingHeaderProps {
   showNetworkInfo: boolean;
   setShowNetworkInfo: (value: boolean) => void;
   copyRoomId: () => void;
+  setNotesOpen: (open: boolean) => void;
 }
 
 const MeetingHeader: React.FC<MeetingHeaderProps> = ({
@@ -19,6 +20,7 @@ const MeetingHeader: React.FC<MeetingHeaderProps> = ({
   showNetworkInfo,
   setShowNetworkInfo,
   copyRoomId,
+  setNotesOpen,
 }) => {
   return (
     <div className="flex-shrink-0 bg-white/95 backdrop-blur-lg border-b border-stone-200/60 px-2 py-1 flex items-center justify-between shadow z-20 relative h-14">
@@ -64,6 +66,22 @@ const MeetingHeader: React.FC<MeetingHeaderProps> = ({
             <small>HTTPS required for camera/mic</small>
           </div>
         )}
+      </div>
+      {/* Center: AI Assistant Icon - lucide-react icon, minimal, glassy, with label below */}
+      <div className="flex-1 flex flex-col items-center justify-center select-none relative">
+        <button
+          className="relative flex flex-col items-center group focus:outline-none"
+          onClick={() => setNotesOpen(true)}
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+          aria-label="Open meeting notes dialog"
+        >
+          <div className="relative flex items-center justify-center">
+            <div className="rounded-full bg-gradient-to-br from-emerald-400/90 to-blue-500/90 shadow-lg border border-white/80 p-1 flex items-center justify-center" style={{ width: 22, height: 22 }}>
+              <Bot className="w-4 h-4 text-white drop-shadow" />
+            </div>
+          </div>
+          <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-stone-900 text-white text-xs rounded px-2 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Meeting Notes</span>
+        </button>
       </div>
       {/* Right: Actions */}
       <div className="flex items-center gap-1">
