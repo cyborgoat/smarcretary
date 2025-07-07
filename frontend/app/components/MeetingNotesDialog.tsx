@@ -1,7 +1,19 @@
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { X, Bot, FileText } from "lucide-react";
+"use client"
+
+import * as React from "react"
+import { useState } from "react"
+import { Bot, FileText, NotebookPen, Users } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Card } from "@/components/ui/card"
+
 
 interface MeetingNotesDialogProps {
   notesOpen: boolean;
@@ -11,6 +23,7 @@ interface MeetingNotesDialogProps {
   meetingNotes: string[];
 }
 
+
 const MeetingNotesDialog: React.FC<MeetingNotesDialogProps> = ({
   notesOpen,
   userNotes,
@@ -18,6 +31,7 @@ const MeetingNotesDialog: React.FC<MeetingNotesDialogProps> = ({
   setNotesOpen,
   meetingNotes,
 }) => {
+  const [tab, setTab] = useState("personal")
   const [summaryUserNotes, setSummaryUserNotes] = useState<string>("");
   const [summaryMeetingNotes, setSummaryMeetingNotes] = useState<string>("");
   const [loadingUserNotes, setLoadingUserNotes] = useState(false);
@@ -66,114 +80,110 @@ const MeetingNotesDialog: React.FC<MeetingNotesDialogProps> = ({
     }
   };
 
+
   if (!notesOpen) return null;
-  
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-      <div className="h-full w-full flex items-center justify-center p-4">
-        <Card className="w-full max-w-6xl h-[85vh] flex flex-col shadow-2xl border-0">
-          <CardHeader className="relative border-b bg-gradient-to-r from-slate-50 to-stone-50 rounded-t-lg">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-4 h-8 w-8"
-              onClick={() => setNotesOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            
-            <CardTitle className="text-center flex items-center justify-center gap-2 text-xl">
-              <Bot className="h-5 w-5 text-blue-600" />
-              Meeting Intelligence
-            </CardTitle>
-            
-            <div className="flex justify-center gap-3 mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={loadingUserNotes || !userNotes.trim()}
-                onClick={() => summarize(getTaskPrompt(userNotes), setSummaryUserNotes, setLoadingUserNotes)}
-                className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                {loadingUserNotes ? "Analyzing..." : "Summarize My Notes"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={loadingMeetingNotes || meetingNotes.length === 0}
-                onClick={() => summarize(getTaskPrompt(meetingNotes.join('\n')), setSummaryMeetingNotes, setLoadingMeetingNotes)}
-                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-              >
-                <Bot className="h-4 w-4 mr-2" />
-                {loadingMeetingNotes ? "Analyzing..." : "Summarize Transcription"}
-              </Button>
-            </div>
-            
+    <Dialog open={notesOpen} onOpenChange={setNotesOpen}>
+      <DialogContent className="overflow-hidden p-0 md:max-h-[600px] md:max-w-[700px] lg:max-w-[800px]">
+        <DialogTitle className="sr-only">Meeting Notes</DialogTitle>
+        <DialogDescription className="sr-only">
+          View and manage your personal and meeting notes.
+        </DialogDescription>
+        <div className="flex flex-col md:flex-row h-[480px]">
+          {/* Sidebar Tabs */}
+          <div className="w-full md:w-48 bg-muted/50 border-r border-border flex flex-row md:flex-col py-4">
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+              <TabsList className="flex md:flex-col w-full h-full bg-muted/50">
+                <TabsTrigger value="personal" className="flex-1 flex items-center gap-2 px-4 py-3 md:py-2 md:px-2 text-base md:text-sm">
+                  <NotebookPen className="h-5 w-5" />
+                  <span className="hidden md:inline">Personal Notes</span>
+                </TabsTrigger>
+                <TabsTrigger value="meeting" className="flex-1 flex items-center gap-2 px-4 py-3 md:py-2 md:px-2 text-base md:text-sm">
+                  <Users className="h-5 w-5" />
+                  <span className="hidden md:inline">Meeting Notes</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col">
+              <TabsContent value="personal" className="flex-1 flex flex-col p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <NotebookPen className="h-5 w-5 text-slate-600" />
+                  <h3 className="text-lg font-semibold text-slate-800">Your Notes</h3>
+                </div>
+                <textarea
+                  className="flex-1 w-full border border-input rounded-md px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-none bg-background"
+                  placeholder="Type your meeting notes here..."
+                  value={userNotes}
+                  onChange={e => setUserNotes(e.target.value)}
+                />
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loadingUserNotes || !userNotes.trim()}
+                    onClick={() => summarize(getTaskPrompt(userNotes), setSummaryUserNotes, setLoadingUserNotes)}
+                    className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    {loadingUserNotes ? "Analyzing..." : "Summarize My Notes"}
+                  </Button>
+                  <Button onClick={saveNotes} size="sm" className="ml-auto">Save Notes</Button>
+                </div>
+                {summaryUserNotes && (
+                  <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <h4 className="font-semibold text-emerald-800 mb-2">Summary & Tasks</h4>
+                    <div className="text-sm text-emerald-700 whitespace-pre-line max-h-32 overflow-auto">
+                      {summaryUserNotes}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+              <TabsContent value="meeting" className="flex-1 flex flex-col p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="h-5 w-5 text-slate-600" />
+                  <h3 className="text-lg font-semibold text-slate-800">Meeting Notes</h3>
+                </div>
+                <textarea
+                  className="flex-1 w-full border border-input rounded-md px-3 py-2 text-sm bg-muted/50 resize-none focus:outline-none"
+                  value={meetingNotes.join('\n')}
+                  placeholder="Voice transcription will appear here..."
+                  readOnly
+                />
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loadingMeetingNotes || meetingNotes.length === 0}
+                    onClick={() => summarize(getTaskPrompt(meetingNotes.join('\n')), setSummaryMeetingNotes, setLoadingMeetingNotes)}
+                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                  >
+                    <Bot className="h-4 w-4 mr-2" />
+                    {loadingMeetingNotes ? "Analyzing..." : "Summarize Transcription"}
+                  </Button>
+                </div>
+                {summaryMeetingNotes && (
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-semibold text-blue-800 mb-2">Summary & Tasks</h4>
+                    <div className="text-sm text-blue-700 whitespace-pre-line max-h-32 overflow-auto">
+                      {summaryMeetingNotes}
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
             {error && (
               <div className="text-center text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2 mt-2">
                 {error}
               </div>
             )}
-          </CardHeader>
-          
-          <CardContent className="flex-1 p-0 flex flex-col md:flex-row min-h-0">
-            {/* Left: User Notes */}
-            <div className="flex-1 flex flex-col p-6 border-b md:border-b-0 md:border-r border-border">
-              <div className="flex items-center gap-2 mb-3">
-                <FileText className="h-4 w-4 text-slate-600" />
-                <h3 className="text-lg font-semibold text-slate-800">Your Notes</h3>
-              </div>
-              
-              <textarea
-                className="flex-1 w-full border border-input rounded-md px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-none bg-background"
-                placeholder="Type your meeting notes here..."
-                value={userNotes}
-                onChange={e => setUserNotes(e.target.value)}
-              />
-              
-              {summaryUserNotes && (
-                <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-                  <h4 className="font-semibold text-emerald-800 mb-2">Summary & Tasks</h4>
-                  <div className="text-sm text-emerald-700 whitespace-pre-line max-h-32 overflow-auto">
-                    {summaryUserNotes}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Right: Voice Transcription */}
-            <div className="flex-1 flex flex-col p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <Bot className="h-4 w-4 text-slate-600" />
-                <h3 className="text-lg font-semibold text-slate-800">Voice Transcription</h3>
-              </div>
-              
-              <textarea
-                className="flex-1 w-full border border-input rounded-md px-3 py-2 text-sm bg-muted/50 resize-none focus:outline-none"
-                value={meetingNotes.join('\n')}
-                placeholder="Voice transcription will appear here..."
-                readOnly
-              />
-              
-              {summaryMeetingNotes && (
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="font-semibold text-blue-800 mb-2">Summary & Tasks</h4>
-                  <div className="text-sm text-blue-700 whitespace-pre-line max-h-32 overflow-auto">
-                    {summaryMeetingNotes}
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-          <div className="flex justify-end p-6 border-t border-border">
-            <Button onClick={saveNotes} size="sm">
-              Save Notes
-            </Button>
           </div>
-        </Card>
-      </div>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
