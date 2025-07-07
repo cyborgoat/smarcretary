@@ -47,6 +47,72 @@ export function useWebRTC(
   const [isVideoOn, setIsVideoOn] = useState(true)
   const [isConnecting, setIsConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const screenShareStreamRef = useRef<MediaStream | null>(null)
+  // Start screen sharing
+  const startScreenShare = useCallback(async () => {
+    if (!navigator.mediaDevices.getDisplayMedia) {
+      setError("Screen sharing is not supported in this browser.");
+      return;
+    }
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      screenShareStreamRef.current = screenStream;
+      setIsScreenSharing(true);
+      // Replace video track in local stream and all peer connections
+      const screenTrack = screenStream.getVideoTracks()[0];
+      if (localStreamRef.current) {
+        const sender = Array.from(peersRef.current.values()).flatMap(peer => peer.getSenders()).find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(screenTrack);
+        }
+        // Replace local video for self
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        localStreamRef.current.removeTrack(oldTrack);
+        localStreamRef.current.addTrack(screenTrack);
+        setLocalStream(new MediaStream([...localStreamRef.current.getAudioTracks(), screenTrack]));
+      }
+      // Listen for screen share end
+      screenTrack.onended = () => {
+        stopScreenShare();
+      };
+    } catch (err) {
+      // Only show error if user did not cancel (AbortError or NotAllowedError with empty message)
+      if (
+        err &&
+        ((err instanceof DOMException && (err.name === 'AbortError' || (err.name === 'NotAllowedError' && (!err.message || err.message === '')))) ||
+         (err instanceof Error && err.name === 'AbortError'))
+      ) {
+        // User cancelled, do not show error
+        return;
+      }
+      setError("Failed to start screen sharing: " + (err instanceof Error ? err.message : String(err)));
+    }
+  }, []);
+
+  // Stop screen sharing
+  const stopScreenShare = useCallback(() => {
+    if (!isScreenSharing) return;
+    if (screenShareStreamRef.current) {
+      screenShareStreamRef.current.getTracks().forEach(track => track.stop());
+      screenShareStreamRef.current = null;
+    }
+    setIsScreenSharing(false);
+    // Restore camera video track
+    navigator.mediaDevices.getUserMedia({ video: true }).then(camStream => {
+      const camTrack = camStream.getVideoTracks()[0];
+      if (localStreamRef.current) {
+        const sender = Array.from(peersRef.current.values()).flatMap(peer => peer.getSenders()).find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(camTrack);
+        }
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        localStreamRef.current.removeTrack(oldTrack);
+        localStreamRef.current.addTrack(camTrack);
+        setLocalStream(new MediaStream([...localStreamRef.current.getAudioTracks(), camTrack]));
+      }
+    });
+  }, [isScreenSharing]);
 
   const localStreamRef = useRef<MediaStream | null>(null)
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map())
@@ -449,6 +515,9 @@ export function useWebRTC(
     isVideoOn,
     isConnecting,
     error,
+    isScreenSharing,
+    startScreenShare,
+    stopScreenShare,
     toggleMute,
     toggleVideo,
     initializeMedia,

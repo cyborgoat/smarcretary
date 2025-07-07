@@ -87,6 +87,9 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
     participants,
     isMuted,
     isVideoOn,
+    isScreenSharing,
+    startScreenShare,
+    stopScreenShare,
     isConnecting,
     error: webrtcError,
     toggleMute,
@@ -482,8 +485,11 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
               <ControlOverlay
                 isMuted={isMuted}
                 isVideoOn={isVideoOn}
+                isScreenSharing={isScreenSharing}
                 onMute={toggleMute}
                 onVideo={toggleVideo}
+                onScreenShare={startScreenShare}
+                onStopScreenShare={stopScreenShare}
                 onLeave={handleLeave}
                 localStream={localStream}
                 isMobile={isMobile}
