@@ -85,7 +85,7 @@ export function useSocket(
   }, [roomId, userName, onMessage, onSignal])
 
   const sendMessage = useCallback(
-    (content: string) => {
+    (content: string, isTranscription = false) => {
       if (ws.current?.readyState === WebSocket.OPEN) {
         const message = {
           type: "chatMessage",
@@ -94,6 +94,7 @@ export function useSocket(
           content,
           timestamp: new Date().toISOString(),
           userId: "current-user", // This should ideally come from backend auth
+          ...(isTranscription ? { isTranscription: true } : {}),
         }
         ws.current.send(JSON.stringify(message))
       } else {

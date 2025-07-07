@@ -70,12 +70,8 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
   const dragStartPos = useRef({ x: 0, y: 0 });
   const dragStartPipPos = useRef({ x: 0, y: 0 });
 
-  // --- Meeting Notes: store all chat messages ---
-  useEffect(() => {
-    if (messages.length > 0) {
-      setMeetingNotes((prev) => [...prev, messages[messages.length - 1].content]);
-    }
-  }, [messages]);
+
+  // --- Only append transcriptions to meetingNotes, not all chat messages ---
 
   // Stable callback to send signaling messages via the WebSocket
   const sendSignalingMessage = useCallback((message: object) => {
@@ -100,17 +96,30 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
     handleSignal,
   } = useWebRTC(userName, sendSignalingMessage)
 
+
   // Stable callback to handle incoming chat messages
-  const handleChatMessage = useCallback((message: Message) => {
-    setMessages((prev) => [...prev, message])
-  }, [])
+  const handleChatMessage = useCallback((message: any) => {
+    if (message.isTranscription) {
+      setMeetingNotes((prev) => [...prev, `${message.user}: ${message.content}`]);
+    } else {
+      setMessages((prev) => [...prev, message]);
+    }
+  }, []);
+
 
   const {
     isConnected,
-    sendMessage: sendSocketMessage,
+    sendMessage: _sendMessage,
     sendJsonMessage,
     error: socketError,
-  } = useSocket(roomId, userName, handleChatMessage, handleSignal)
+  } = useSocket(roomId, userName, handleChatMessage, handleSignal);
+
+  // Wrap sendMessage to allow isTranscription flag
+  const sendSocketMessage = (content: string, isTranscription = false) => {
+    if (_sendMessage) {
+      _sendMessage(content, isTranscription);
+    }
+  };
 
   // When the WebSocket connection is established, `sendJsonMessage` becomes available.
   // We store it in a ref so the `sendSignalingMessage` callback can access it.
@@ -292,6 +301,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
   const pipParticipant = allParticipants[pipIdx];
 
   // --- Caption: record and send audio for main speaker only ---
+
   useEffect(() => {
     if (!captionsEnabled || !mainParticipant || !mainParticipant.isLocal || !mainParticipant.stream) return;
     // Only record if local user is main video
@@ -314,11 +324,14 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
           const formData = new FormData();
           formData.append("file", blob, "audio.wav");
           try {
-          const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/voice/transcribe`, { method: "POST", body: formData });
+            const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/voice/transcribe`, { method: "POST", body: formData });
             const data = await resp.json();
             if (data.text) {
               setCaption(data.text);
-              setMeetingNotes(prev => prev[prev.length - 1] === data.text ? prev : [...prev, data.text]);
+              // Broadcast transcription as chatMessage to all participants, mark as transcription
+              if (sendSocketMessage) {
+                sendSocketMessage(data.text, true);
+              }
             }
           } catch (e) { setCaption(""); }
           if (!stopped) recordAndSend();
@@ -328,7 +341,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
     };
     startRecording();
     return () => { stopped = true; audioRecorderRef.current && audioRecorderRef.current.stop(); };
-  }, [captionsEnabled, mainParticipant && mainParticipant.isLocal, mainParticipant && mainParticipant.stream]);
+  }, [captionsEnabled, mainParticipant && mainParticipant.isLocal, mainParticipant && mainParticipant.stream, sendSocketMessage]);
 
   // --- Host logic ---
   // The host is the user with the lexicographically smallest name (or id) in the room
