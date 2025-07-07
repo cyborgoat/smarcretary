@@ -29,7 +29,7 @@ const MeetingNotesDialog: React.FC<MeetingNotesDialogProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch("https://10.0.0.37:8080/voice/summarize", {
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/voice/summarize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),

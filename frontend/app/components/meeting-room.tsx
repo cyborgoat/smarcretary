@@ -4,22 +4,21 @@ import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from "
 // @ts-ignore
 import Recorder from "recorder-js";
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
-  MicOff,
-  Settings,
-  Share,
   AlertTriangle,
   Bot,
 } from "lucide-react"
 import { useWebRTC } from "../hooks/useWebRTC"
 import { useSocket } from "../hooks/useSocket"
-import { VideoThumbnail } from "@/components/ui/VideoThumbnail"
 import MeetingSidebar from "./MeetingSidebar"
 import ControlOverlay from "./ControlOverlay"
 import MeetingNotesDialog from "./MeetingNotesDialog"
+import MeetingHeader from "./meeting-room/MeetingHeader";
+import VideoTile from "./meeting-room/VideoTile";
+import MeetingInfoOverlay from "./meeting-room/MeetingInfoOverlay";
+import PiPVideo from "./meeting-room/PiPVideo";
 
 interface Message {
   id: string
@@ -278,106 +277,7 @@ export default function MeetingRoom({ roomId, userName, onLeave }: MeetingRoomPr
   useEffect(() => { setHydrated(true); }, []);
 
 // --- VideoTile: Generic video/participant tile for local or remote ---
-
-
-interface VideoTileProps {
-  stream?: MediaStream;
-  name: string;
-  isMuted: boolean;
-  isVideoOn: boolean;
-  isLocal?: boolean;
-  volume?: number;
-  muted?: boolean;
-  onVolumeChange?: (v: number) => void;
-  className?: string;
-  style?: React.CSSProperties;
-  showVolume?: boolean;
-}
-
-const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
-  stream,
-  name,
-  isMuted,
-  isVideoOn,
-  isLocal,
-  volume = 1,
-  muted = false,
-  onVolumeChange,
-  className = "",
-  style = {},
-  showVolume = false,
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-
-  useEffect(() => {
-    if (stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
-    }
-    if (stream && audioRef.current && !isLocal) {
-      audioRef.current.srcObject = stream;
-      audioRef.current.volume = volume ?? 1;
-      audioRef.current.muted = muted ?? false;
-    }
-  }, [stream, volume, muted, isLocal]);
-
-  return (
-    <div className={`relative w-full h-full flex items-center justify-center ${className}`} style={style}>
-      {stream && isVideoOn ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isLocal}
-          className="w-full h-full object-cover rounded-lg"
-          style={isLocal ? { transform: "scaleX(-1)" } : {}}
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg">
-          <Avatar className="h-24 w-24 mx-auto mb-4">
-            <AvatarFallback className="text-2xl bg-gray-600">
-              {name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="absolute bottom-2 left-2 right-2 text-center text-white">
-            <h3 className="text-xl font-semibold">{name}</h3>
-            <p className="text-gray-300">Camera is off</p>
-          </div>
-        </div>
-      )}
-      {/* Audio for remote participant */}
-      {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
-      {/* Mute indicator */}
-      {isMuted && (
-        <div className="absolute top-2 right-2 bg-red-500 rounded-full p-1 z-20">
-          <MicOff className="h-4 w-4 text-white" />
-        </div>
-      )}
-      {/* Volume control overlay */}
-      {showVolume && onVolumeChange && !isLocal && (
-        <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 rounded-lg px-3 py-2 opacity-0 hover:opacity-100 transition-opacity">
-          <div className="flex items-center">
-            <label htmlFor="main-volume" className="text-xs text-white mr-2">Volume</label>
-            <input
-              id="main-volume"
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={volume}
-              onChange={e => onVolumeChange(Number(e.target.value))}
-              className="w-16"
-            />
-          </div>
-        </div>
-      )}
-      {/* Name overlay for PiP/thumbnail */}
-      <div className="absolute bottom-1 left-1 right-1 bg-black bg-opacity-50 rounded px-1 py-0.5">
-        <p className="text-white text-xs truncate">{name}{isLocal ? " (You)" : ""}</p>
-      </div>
-    </div>
-  );
-});
+// (Moved to ./meeting-room/VideoTile)
 
 
   // --- Refactored main video and PiP logic ---
@@ -401,7 +301,7 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
         const RecorderJS = (await import("recorder-js")).default;
         audioRecorderRef.current = new RecorderJS(window.AudioContext ? new window.AudioContext() : (window as any).webkitAudioContext && new (window as any).webkitAudioContext());
       }
-      if (!audioStreamRef.current) {
+      if (!audioStreamRef.current && mainParticipant.stream) {
         audioStreamRef.current = mainParticipant.stream;
       }
       await audioRecorderRef.current.init(audioStreamRef.current);
@@ -414,7 +314,7 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
           const formData = new FormData();
           formData.append("file", blob, "audio.wav");
           try {
-          const resp = await fetch("https://10.0.0.37:8080/voice/transcribe", { method: "POST", body: formData });
+          const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/voice/transcribe`, { method: "POST", body: formData });
             const data = await resp.json();
             if (data.text) {
               setCaption(data.text);
@@ -438,66 +338,14 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-stone-100 to-stone-200">
-      {/* Header */}
-      <div className="flex-shrink-0 bg-white/95 backdrop-blur-lg border-b border-stone-200/60 px-2 py-1 flex items-center justify-between shadow z-20 relative h-14">
-        {/* Left: Room info, status, and network */}
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-bold text-stone-700 tracking-widest uppercase bg-stone-100 rounded px-2 py-0.5 shadow-sm border border-stone-200/70">{roomId}</span>
-          <Badge variant="secondary" className={`text-white text-[10px] px-2 py-0.5 rounded-full shadow ${isConnected ? 'bg-emerald-600' : 'bg-amber-600'}`}>{isConnected ? "Connected" : "Connecting..."}</Badge>
-          {isConnecting && (
-            <Badge variant="secondary" className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow">Init</Badge>
-          )}
-          <button
-            className={`ml-1 w-2.5 h-2.5 rounded-full border border-stone-300 ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'} flex items-center justify-center relative transition-colors`}
-            title="Network info"
-            onClick={() => setShowNetworkInfo((v) => !v)}
-            aria-label="Show network info"
-          >
-            <span className="sr-only">Network info</span>
-          </button>
-          {showNetworkInfo && (
-            <div className="absolute top-12 left-0 bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-stone-200 text-xs z-50 shadow-lg min-w-[180px]">
-              <strong>Network:</strong> <br />
-              <code className="bg-stone-900 px-1 rounded text-xs">{window.location.origin.replace('localhost', '10.0.0.37')}?room={roomId}&name=YourName</code>
-              <br />
-              <small>HTTPS required for camera/mic</small>
-            </div>
-          )}
-        </div>
-        {/* Center: AI Assistant Icon - lucide-react icon, minimal, glassy, with label below */}
-        <div className="flex-1 flex flex-col items-center justify-center select-none relative">
-          <button
-            className="relative flex flex-col items-center group focus:outline-none"
-            onClick={() => setNotesOpen(true)}
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-            aria-label="Open meeting notes dialog"
-          >
-            <div className="relative flex items-center justify-center">
-              <div className="rounded-full bg-gradient-to-br from-emerald-400/90 to-blue-500/90 shadow-lg border border-white/80 p-1 flex items-center justify-center" style={{ width: 22, height: 22 }}>
-                <Bot className="w-4 h-4 text-white drop-shadow" />
-              </div>
-            </div>
-            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-stone-900 text-white text-xs rounded px-2 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Meeting Notes</span>
-          </button>
-        </div>
-      {/* Meeting Notes Dialog */}
-      <MeetingNotesDialog
-        notesOpen={notesOpen}
-        userNotes={userNotes}
-        setUserNotes={setUserNotes}
-        setNotesOpen={setNotesOpen}
-        meetingNotes={meetingNotes}
+      <MeetingHeader
+        roomId={roomId}
+        isConnected={isConnected}
+        isConnecting={isConnecting}
+        showNetworkInfo={showNetworkInfo}
+        setShowNetworkInfo={setShowNetworkInfo}
+        copyRoomId={copyRoomId}
       />
-        {/* Right: Actions */}
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 px-2 py-1 rounded-lg" onClick={copyRoomId}>
-            <Share className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="text-stone-600 hover:text-stone-900 hover:bg-stone-100 px-2 py-1 rounded-lg">
-            <Settings className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
 
       {/* Error Alerts */}
       {(permissionError || webrtcError || socketError) && (
@@ -583,42 +431,23 @@ const VideoTile: React.FC<VideoTileProps> = memo(function VideoTile({
                 captionsEnabled,
                 caption
               ])}
+
               {/* PiP/Thumbnail: show only one mini video, same logic for mobile and desktop */}
-              {(pipParticipant && pipIdx !== -1 && pipIdx !== mainIdx) && (
-                <div
-                  className="absolute cursor-move bg-white/90 backdrop-blur-sm rounded-xl border-2 border-stone-300 shadow-lg z-20"
-                  ref={pipRef}
-                  style={{
-                    left: pipPosition.x,
-                    top: pipPosition.y,
-                    width: isMobile ? 100 : 200,
-                    height: isMobile ? 75 : 150,
-                  }}
-                  onMouseDown={handleMouseDown}
-                  onClick={() => {
-                    setIsMainVideoLocal(pipParticipant.isLocal)
-                    if (!pipParticipant.isLocal) setSelectedParticipantId(pipParticipant.id)
-                  }}
-                >
-                  <VideoThumbnail
-                    stream={pipParticipant.stream ?? undefined}
-                    name={pipParticipant.name}
-                    isMuted={pipParticipant.isMuted}
-                    isVideoOn={pipParticipant.isVideoOn}
-                    isLocal={pipParticipant.isLocal}
-                    selected={false}
-                    style={{ width: isMobile ? 100 : 200, height: isMobile ? 75 : 150 }}
-                  />
-                </div>
-              )}
+              <PiPVideo
+                pipParticipant={pipParticipant}
+                pipIdx={pipIdx}
+                mainIdx={mainIdx}
+                pipRef={pipRef}
+                pipPosition={pipPosition}
+                isMobile={isMobile}
+                handleMouseDown={handleMouseDown}
+                setIsMainVideoLocal={setIsMainVideoLocal}
+                setSelectedParticipantId={setSelectedParticipantId}
+              />
 
               {/* Meeting Info Overlay */}
-              <div className="absolute top-2 left-2 bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 z-20">
-                <p className="text-white text-xs">
-                  {participants.length + 1} participants • {currentTime}
-                </p>
-              </div>
-              
+              <MeetingInfoOverlay participantCount={participants.length + 1} currentTime={currentTime} />
+
               {/* Mute indicator */}
               {/* Only show mute indicator in VideoTile, not here to avoid duplicate icons */}
 
