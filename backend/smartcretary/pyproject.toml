@@ -20,6 +20,9 @@ dependencies = [
     "sounddevice>=0.5.2",
     "numpy>=1.24.4",
     "torch>=2.0.0",
+    "pillow>=10.4.0",
+    "torchaudio>=2.5.1",
+    "torchvision>=0.20.1",
 ]
 
 [project.optional-dependencies]

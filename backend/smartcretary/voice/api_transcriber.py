@@ -13,7 +13,9 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://10.0.0.19:11434/api/generate")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:latest")
 
 # --- Whisper Model ---
-WHISPER_MODEL = whisper.load_model("tiny")
+import torch
+WHISPER_MODEL = whisper.load_model("tiny", device="cpu")
+WHISPER_MODEL = WHISPER_MODEL.to(dtype=torch.float32)
 
 class TranscribeResponse(BaseModel):
     text: str
@@ -34,7 +36,7 @@ def transcribe_audio(file: UploadFile = File(...)):
         tmpfile.write(file.file.read())
         tmpfile_path = tmpfile.name
     try:
-        result = WHISPER_MODEL.transcribe(tmpfile_path)
+        result = WHISPER_MODEL.transcribe(tmpfile_path, fp16=False)
         text = result.get("text", "")
         os.remove(tmpfile_path)
         return {"text": text}
